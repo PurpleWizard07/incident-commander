@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@theme {
+  --font-mono: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+
+  --color-ic-bg: #0b0e14;
+  --color-ic-panel: #11151d;
+  --color-ic-panel-2: #161b26;
+  --color-ic-border: #232a38;
+  --color-ic-text: #d7dce5;
+  --color-ic-text-dim: #7c8698;
+  --color-ic-healthy: #22c55e;
+  --color-ic-degraded: #eab308;
+  --color-ic-down: #ef4444;
+  --color-ic-accent: #38bdf8;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-ic-bg);
+  color: var(--color-ic-text);
+}
+
+* {
+  box-sizing: border-box;
+}

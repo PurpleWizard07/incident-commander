@@ -85,6 +85,46 @@ export function searchTraces(session: SessionState, opts: { service: string | nu
   };
 }
 
+/**
+ * Console-only (never a WebMCP tool — plan §11's separation of `/api/sim/*`
+ * and `/api/audit` applies here too): returns raw MetricSeries with full point
+ * arrays, for the metrics chart to render. `compare_metrics` deliberately
+ * strips points down to baseline/current/onset for the agent's 1.5K budget —
+ * "the chart is for the human; the summary is for the agent" (plan §11 line
+ * ~1130). No endpoint existed for the human's actual chart data; this is it.
+ */
+export function getMetricSeries(
+  session: SessionState,
+  opts: { services: string[] | null; metrics: string[] | null; fromMinute: string | null; toMinute: string | null }
+) {
+  const scenario = getScenario(session.scenarioId);
+  const world = materializeWorld(scenario, session.seed, session.nowMinute);
+
+  const defaultServices = session.incidents[0]?.affectedServices ?? SERVICE_IDS;
+  const requestedServices = (opts.services?.filter(isServiceId) as ServiceId[] | undefined) ?? defaultServices;
+  const requestedMetrics = (opts.metrics as MetricName[] | undefined) ?? (["error_rate", "latency_p99"] as MetricName[]);
+  const fromMinute = opts.fromMinute ? Number(opts.fromMinute) : Math.max(0, session.nowMinute - 90);
+  const toMinute = opts.toMinute ? Number(opts.toMinute) : session.nowMinute;
+
+  const series = requestedServices.flatMap((service) =>
+    requestedMetrics.flatMap((metric) => {
+      const found = world.metrics.find((m) => m.service === service && m.metric === metric);
+      if (!found) return [];
+      return [
+        {
+          service,
+          metric,
+          unit: found.unit,
+          baseline: found.baseline,
+          points: found.points.filter((p) => p.minute >= fromMinute && p.minute <= toMinute),
+        },
+      ];
+    })
+  );
+
+  return { status: 200, body: { series } };
+}
+
 export function compareMetrics(
   session: SessionState,
   opts: { services: string[] | null; metrics: string[] | null; fromMinute: string | null; toMinute: string | null }

@@ -112,6 +112,17 @@ export default async (req: Request): Promise<Response> => {
         const session = await loadSession(sessionId);
         return json(observability.searchTraces(session, { service: q.get("service"), status: q.get("status"), limit: q.get("limit") }));
       }
+      if (path === "/api/metrics/series") {
+        const session = await loadSession(sessionId);
+        return json(
+          observability.getMetricSeries(session, {
+            services: csv(q.get("services")),
+            metrics: csv(q.get("metrics")),
+            fromMinute: q.get("fromMinute"),
+            toMinute: q.get("toMinute"),
+          })
+        );
+      }
       if (path === "/api/metrics/compare") {
         const session = await loadSession(sessionId);
         return json(
