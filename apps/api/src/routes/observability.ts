@@ -92,7 +92,12 @@ export function compareMetrics(
   const scenario = getScenario(session.scenarioId);
   const world = materializeWorld(scenario, session.seed, session.nowMinute);
 
-  const requestedServices = (opts.services?.filter(isServiceId) as ServiceId[] | undefined) ?? SERVICE_IDS;
+  // Plan §6.3: "Omit for all affected services" — the incident's affected
+  // services, not literally every service in the system. Falls back to
+  // SERVICE_IDS only if there's no incident on record to scope to (shouldn't
+  // happen in practice, since a session always bootstraps one).
+  const defaultServices = session.incidents[0]?.affectedServices ?? SERVICE_IDS;
+  const requestedServices = (opts.services?.filter(isServiceId) as ServiceId[] | undefined) ?? defaultServices;
   const requestedMetrics = (opts.metrics as MetricName[] | undefined) ?? (["error_rate", "latency_p99"] as MetricName[]);
   const fromMinute = opts.fromMinute ? Number(opts.fromMinute) : Math.max(0, session.nowMinute - 90);
   const toMinute = opts.toMinute ? Number(opts.toMinute) : session.nowMinute;

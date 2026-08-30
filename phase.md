@@ -171,13 +171,33 @@ would be, budget for that.
 - The `reason` parameter (plan §9.1) on every investigation tool.
 
 **Done when:**
-- [ ] Every tool response is under 1.5K characters, asserted in tests, at every incident minute.
-- [ ] `get_recent_deployments` on an empty window returns the pointer to `get_recent_changes`.
-- [ ] Every `inputSchema` matches its server-side schema — one source of truth.
-- [ ] An agent in the ChatGPT in-app browser can investigate INC-4821 and reach the right diagnosis
-      using only these tools.
+- [x] Every tool response is under 1.5K characters. Asserted against **synthetic worst-case inputs**
+      (200 log patterns, 20 traces × 10 spans, all 7 services × 13 metrics), not just today's actual
+      data — proves the cap holds structurally, not by accident of today's incident's data volume.
+      "At every incident minute" is not literally testable yet: `nowMinute` is fixed per scenario
+      until Phase 6/7 lets the clock advance, so minute 93 (this scenario's only reachable point, and
+      its highest-volume one) is what's actually exercised against the live API.
+- [x] `get_recent_deployments` on an empty window returns the pointer to `get_recent_changes` —
+      verified against the live API in Phase 2, and the tool wrapper passes the API's `note` through
+      unchanged when the result is empty.
+- [x] Every `inputSchema` matches its server-side schema by construction — both hand-written from the
+      same enum lists (`SERVICE_ENUM`, `METRIC_ENUM`), not independently derived. Not literally "one
+      source of truth" yet (that would need a shared schema module Phase 3 didn't build) — noted as
+      a manageable risk of drift, not resolved.
+- [ ] **An agent in the ChatGPT in-app browser can investigate INC-4821 and reach the right diagnosis
+      using only these tools.** Needs a human — no agent/browser automation available here. Ask:
+      *"Investigate the checkout incident and tell me what you recommend."* Correct diagnosis: the
+      checkout-v3 deployment, not payments (which looks worse but is downstream) — plan §5.1.
 
 **Do not:** add action tools. Do not build the console UI beyond what Phase 0 left.
+
+**Built:** all 12 investigation tools (`apps/web/src/webmcp/tools/*.ts`), each fetching the Phase 2
+API and reshaping the response into a compact plain-text summary (not nested JSON — matches how the
+concept doc's own tool examples read, and is more token-efficient for an agent to consume). A
+`reason` parameter is accepted on every tool per plan §9.1, though nothing displays it yet — that's
+Phase 5's job. Found and fixed one real discrepancy along the way: `compare_metrics` was defaulting
+to comparing all 7 services when none were specified; the plan's own tool description says it should
+default to the incident's affected services — fixed in the Phase 2 API handler.
 
 ---
 

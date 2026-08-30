@@ -1,4 +1,8 @@
-import { SERVICE_IDS } from "@incident-commander/shared";
+import { getActiveIncidents, getIncident, getIncidentTimeline } from "./tools/incidents.js";
+import { getServiceHealth, getServiceDependencies } from "./tools/services.js";
+import { getRecentDeployments, getRecentChanges } from "./tools/deploymentsAndChanges.js";
+import { queryLogs, searchTraces, compareMetrics } from "./tools/observability.js";
+import { inspectAlert, getRunbook } from "./tools/alertsAndRunbooks.js";
 
 export type ToolCallLogEntry = {
   id: string;
@@ -22,11 +26,27 @@ function emit(entry: ToolCallLogEntry) {
   for (const l of listeners) l(entry);
 }
 
+const INVESTIGATION_TOOLS = [
+  getActiveIncidents,
+  getIncident,
+  getIncidentTimeline,
+  getServiceHealth,
+  getServiceDependencies,
+  getRecentDeployments,
+  getRecentChanges,
+  queryLogs,
+  searchTraces,
+  compareMetrics,
+  inspectAlert,
+  getRunbook,
+];
+
 /**
- * Phase 0: a single hardcoded investigation tool, registered imperatively via
- * document.modelContext.registerTool(). Real tool set arrives in Phase 3.
+ * Phase 3: the 12 read-only investigation tools from plan §6.3, registered
+ * imperatively via document.modelContext.registerTool(). Action and approval
+ * tools are Phase 6/7 — this is deliberately investigation-only so far.
  */
-export function registerPhase0Tools(): () => void {
+export function registerInvestigationTools(): () => void {
   if (typeof document === "undefined" || !document.modelContext) {
     console.warn(
       "[webmcp] document.modelContext is not available in this browser. " +
@@ -37,48 +57,27 @@ export function registerPhase0Tools(): () => void {
 
   const controller = new AbortController();
 
-  document.modelContext.registerTool(
-    {
-      name: "get_service_health",
-      description:
-        "Inspect the current health of a production service. Reports status, error rate, " +
-        "and p95 latency compared to its pre-incident baseline. Use this to establish " +
-        "whether a service is genuinely abnormal.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          service: {
-            type: "string",
-            enum: SERVICE_IDS as unknown as string[],
-            description: "Which service to check.",
-          },
+  for (const tool of INVESTIGATION_TOOLS) {
+    document.modelContext.registerTool(
+      {
+        ...tool,
+        execute: async (input: Record<string, unknown>) => {
+          const id = crypto.randomUUID();
+          const at = new Date().toISOString();
+          try {
+            const result = await tool.execute(input);
+            emit({ id, at, tool: tool.name, args: input, result });
+            return result;
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            emit({ id, at, tool: tool.name, args: input, result: null, error: message });
+            throw err;
+          }
         },
-        required: ["service"],
       },
-      annotations: {
-        readOnlyHint: true,
-      },
-      execute: async (input: Record<string, unknown>) => {
-        const service = String(input.service ?? "");
-        const id = crypto.randomUUID();
-        const at = new Date().toISOString();
-
-        try {
-          const res = await fetch(`/api/service-health?service=${encodeURIComponent(service)}`);
-          const data = await res.json();
-          emit({ id, at, tool: "get_service_health", args: input, result: data });
-          return {
-            content: [{ type: "text", text: JSON.stringify(data) }],
-          };
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          emit({ id, at, tool: "get_service_health", args: input, result: null, error: message });
-          throw err;
-        }
-      },
-    },
-    { signal: controller.signal }
-  );
+      { signal: controller.signal }
+    );
+  }
 
   return () => controller.abort();
 }

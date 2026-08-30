@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react";
-import { registerPhase0Tools, onToolCall, type ToolCallLogEntry } from "./webmcp/registerTools.js";
+import { registerInvestigationTools, onToolCall, type ToolCallLogEntry } from "./webmcp/registerTools.js";
 
 const SERVICES = ["checkout", "payments", "database"] as const; // subset, for the manual test buttons
+
+function resultText(result: unknown): string {
+  if (result && typeof result === "object" && "content" in result) {
+    const content = (result as { content: { type: string; text?: string }[] }).content;
+    return content.map((c) => c.text ?? "").join("\n");
+  }
+  return JSON.stringify(result);
+}
 
 export default function App() {
   const [supported, setSupported] = useState<boolean | null>(null);
@@ -10,7 +18,7 @@ export default function App() {
 
   useEffect(() => {
     setSupported(typeof document !== "undefined" && !!document.modelContext);
-    const unregister = registerPhase0Tools();
+    const unregister = registerInvestigationTools();
     const unsubscribe = onToolCall((entry) => setLog((prev) => [entry, ...prev].slice(0, 20)));
     return () => {
       unregister();
@@ -19,14 +27,16 @@ export default function App() {
   }, []);
 
   async function callDirectly(service: string) {
-    const res = await fetch(`/api/service-health?service=${encodeURIComponent(service)}`);
+    const res = await fetch(`/api/services/${encodeURIComponent(service)}/health`, {
+      headers: { "X-Session-Id": "manual-check" },
+    });
     const data = await res.json();
     setManualResult(JSON.stringify(data, null, 2));
   }
 
   return (
     <main style={{ fontFamily: "monospace", maxWidth: 720, margin: "2rem auto", lineHeight: 1.5 }}>
-      <h1>Incident Commander — Phase 0</h1>
+      <h1>Incident Commander — Phase 3</h1>
       <p>
         WebMCP support in this browser:{" "}
         <strong>{supported === null ? "checking…" : supported ? "YES" : "NO"}</strong>
@@ -52,9 +62,9 @@ export default function App() {
 
       <h2>Agent tool-call log</h2>
       <p>Ask an agent (in ChatGPT&apos;s in-app browser, or Chrome with WebMCP enabled) something like:</p>
-      <blockquote>&quot;What is the health of the checkout service?&quot;</blockquote>
+      <blockquote>&quot;Investigate the checkout incident and tell me what you recommend.&quot;</blockquote>
       {log.length === 0 ? (
-        <p>(no tool calls yet)</p>
+        <p>(no tool calls yet — 12 investigation tools are registered)</p>
       ) : (
         <ul>
           {log.map((entry) => (
@@ -63,8 +73,8 @@ export default function App() {
                 <strong>{entry.tool}</strong> @ {entry.at}
               </div>
               <div>args: {JSON.stringify(entry.args)}</div>
-              <div>
-                result: {entry.error ? `ERROR: ${entry.error}` : JSON.stringify(entry.result)}
+              <div style={{ whiteSpace: "pre-wrap" }}>
+                {entry.error ? `ERROR: ${entry.error}` : resultText(entry.result)}
               </div>
             </li>
           ))}
