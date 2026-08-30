@@ -1,0 +1,7 @@
+[build]
+  command = "pnpm install --frozen-lockfile=false && pnpm --filter web build"
+  publish = "apps/web/dist"
+  functions = "apps/api/src/functions"
+
+[functions]
+  node_bundler = "esbuild"
