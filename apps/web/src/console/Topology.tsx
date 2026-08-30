@@ -2,6 +2,7 @@ import { SERVICES, SERVICE_IDS } from "@incident-commander/shared";
 import type { ServiceId } from "@incident-commander/shared";
 import type { ServiceHealthSummary } from "./api.js";
 import { statusColor } from "./statusColors.js";
+import { useGlowingCall } from "./toolActivity.js";
 
 const POS: Record<ServiceId, { x: number; y: number }> = {
   frontend: { x: 110, y: 34 },
@@ -18,11 +19,21 @@ const NODE_R = 30;
 export function Topology({ health }: { health: Partial<Record<ServiceId, ServiceHealthSummary>> }) {
   const edges = SERVICE_IDS.flatMap((id) => SERVICES[id].dependsOn.map((dep) => ({ from: id, to: dep })));
 
+  const healthGlow = useGlowingCall(["get_service_health"]);
+  const healthService = healthGlow?.record.args.service as ServiceId | undefined;
+
+  const depsGlow = useGlowingCall(["get_service_dependencies"]);
+  const depsService = depsGlow?.record.args.service as ServiceId | undefined;
+  const depsDirection = (depsGlow?.record.args.direction as string | undefined) ?? "both";
+
   return (
     <svg viewBox="0 0 640 300" width="100%" height="100%" role="img" aria-label="Service dependency topology">
       {edges.map(({ from, to }) => {
         const a = POS[from];
         const b = POS[to];
+        const highlighted =
+          depsService !== undefined &&
+          ((depsDirection !== "upstream" && from === depsService) || (depsDirection !== "downstream" && to === depsService));
         return (
           <line
             key={`${from}-${to}`}
@@ -30,17 +41,21 @@ export function Topology({ health }: { health: Partial<Record<ServiceId, Service
             y1={a.y}
             x2={b.x}
             y2={b.y}
-            stroke="var(--color-ic-border)"
-            strokeWidth={2}
+            stroke={highlighted ? "var(--color-ic-accent)" : "var(--color-ic-border)"}
+            strokeWidth={highlighted ? 3 : 2}
           />
         );
       })}
       {SERVICE_IDS.map((id) => {
         const p = POS[id];
         const h = health[id];
+        const pulsing = id === healthService;
         return (
           <g key={id}>
-            <circle cx={p.x} cy={p.y} r={NODE_R} fill="var(--color-ic-panel-2)" stroke={statusColor(h?.status)} strokeWidth={3} />
+            {pulsing && (
+              <circle cx={p.x} cy={p.y} r={NODE_R + 6} fill="none" stroke="var(--color-ic-accent)" strokeWidth={2} className={healthGlow?.pending ? "animate-ping" : ""} opacity={healthGlow?.pending ? 0.6 : 0.9} />
+            )}
+            <circle cx={p.x} cy={p.y} r={NODE_R} fill="var(--color-ic-panel-2)" stroke={pulsing ? "var(--color-ic-accent)" : statusColor(h?.status)} strokeWidth={pulsing ? 4 : 3} />
             <circle cx={p.x} cy={p.y} r={4} fill={statusColor(h?.status)} />
             <text
               x={p.x}

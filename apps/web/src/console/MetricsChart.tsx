@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Line,
   LineChart,
@@ -11,7 +11,14 @@ import {
 } from "recharts";
 import type { Deployment, MetricName, ServiceId } from "@incident-commander/shared";
 import { SERVICES } from "@incident-commander/shared";
-import type { RawMetricSeries } from "./api.js";
+import { compareMetrics as fetchCompareMetrics, type RawMetricSeries } from "./api.js";
+import { useGlowingCall } from "./toolActivity.js";
+
+interface OnsetMarker {
+  minute: number;
+  metric: MetricName;
+  label: string;
+}
 
 const SERIES_COLORS = ["#38bdf8", "#f97316", "#a78bfa", "#f472b6", "#4ade80", "#facc15", "#f87171"];
 
@@ -45,6 +52,39 @@ export function MetricsChart({
   const services = filtered.map((s) => s.service);
   const unit = filtered[0]?.unit ?? "";
   const relevantDeploys = deployments.filter((d) => services.includes(d.service));
+
+  /**
+   * `compare_metrics`'s visible effect (plan §9): "compared series are drawn
+   * together with onset markers." Reuses the same endpoint the tool itself
+   * calls (`/api/metrics/compare`) rather than re-deriving onset logic here
+   * — the tool already strips series down to onset/baseline/current, which
+   * is exactly what a marker overlay needs. Auto-selects the metric the
+   * agent compared if we already have its series loaded.
+   */
+  const compareGlow = useGlowingCall(["compare_metrics"]);
+  const [onsetMarkers, setOnsetMarkers] = useState<OnsetMarker[]>([]);
+  const appliedCompareId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!compareGlow || compareGlow.pending) return;
+    if (compareGlow.record.id === appliedCompareId.current) return;
+    appliedCompareId.current = compareGlow.record.id;
+    const args = compareGlow.record.args as { services?: string[]; metrics?: string[]; fromMinute?: number; toMinute?: number };
+    if (args.metrics?.length && metrics.includes(args.metrics[0] as MetricName)) {
+      setMetric(args.metrics[0] as MetricName);
+    }
+    fetchCompareMetrics(args)
+      .then((r) => {
+        setOnsetMarkers(
+          r.orderedByOnset.map((o) => ({ minute: o.onsetMinute, metric: o.metric, label: `${o.service} onset` }))
+        );
+      })
+      .catch(() => {});
+  }, [compareGlow, metrics]);
+
+  const compareServices = compareGlow?.record.args.services as string[] | undefined;
+  const emphasizing = compareGlow !== null && !!compareServices?.length;
+  const visibleOnsetMarkers = compareGlow ? onsetMarkers.filter((m) => m.metric === active) : [];
 
   return (
     <div className="flex h-full flex-col">
@@ -101,18 +141,31 @@ export function MetricsChart({
                 }}
               />
             ))}
-            {services.map((service, i) => (
-              <Line
-                key={service}
-                type="monotone"
-                dataKey={service}
-                name={SERVICES[service].displayName}
-                stroke={SERIES_COLORS[i % SERIES_COLORS.length]}
-                dot={false}
-                strokeWidth={2}
-                isAnimationActive={false}
+            {visibleOnsetMarkers.map((m) => (
+              <ReferenceLine
+                key={`onset-${m.metric}-${m.minute}-${m.label}`}
+                x={m.minute}
+                stroke="var(--color-ic-degraded)"
+                strokeDasharray="1 3"
+                label={{ value: m.label, position: "insideTopLeft", fontSize: 9, fill: "var(--color-ic-degraded)" }}
               />
             ))}
+            {services.map((service, i) => {
+              const dimmed = emphasizing && !compareServices!.includes(service);
+              return (
+                <Line
+                  key={service}
+                  type="monotone"
+                  dataKey={service}
+                  name={SERVICES[service].displayName}
+                  stroke={SERIES_COLORS[i % SERIES_COLORS.length]}
+                  strokeOpacity={dimmed ? 0.25 : 1}
+                  dot={false}
+                  strokeWidth={emphasizing && !dimmed ? 3 : 2}
+                  isAnimationActive={false}
+                />
+              );
+            })}
           </LineChart>
         </ResponsiveContainer>
       </div>

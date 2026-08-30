@@ -4,26 +4,42 @@ import { getRecentDeployments, getRecentChanges } from "./tools/deploymentsAndCh
 import { queryLogs, searchTraces, compareMetrics } from "./tools/observability.js";
 import { inspectAlert, getRunbook } from "./tools/alertsAndRunbooks.js";
 
-export type ToolCallLogEntry = {
+/**
+ * One record per tool call, updated in place from `start` (settledAt: null)
+ * to settled (settledAt: a timestamp) — rather than two separate events —
+ * so consumers never have to correlate two messages by id themselves.
+ * Feeds the Phase 5 reactivity contract (plan §9): the UI's pending vs.
+ * settled treatment comes directly from `settledAt`, and `reason` (plan
+ * §9.1) rides along on the same record the activity rail already renders.
+ */
+export interface ToolCallRecord {
   id: string;
-  at: string;
   tool: string;
-  args: unknown;
-  result: unknown;
+  args: Record<string, unknown>;
+  reason?: string;
+  startedAt: number;
+  settledAt: number | null;
+  result?: unknown;
   error?: string;
-};
+}
 
-type Listener = (entry: ToolCallLogEntry) => void;
+type Listener = (records: ToolCallRecord[]) => void;
 
 const listeners = new Set<Listener>();
+const MAX_RECORDS = 50;
+let records: ToolCallRecord[] = [];
 
-export function onToolCall(listener: Listener): () => void {
+/** Calls back immediately with the current snapshot, then on every change. */
+export function onToolActivity(listener: Listener): () => void {
+  listener(records);
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
 
-function emit(entry: ToolCallLogEntry) {
-  for (const l of listeners) l(entry);
+function upsert(record: ToolCallRecord) {
+  const idx = records.findIndex((r) => r.id === record.id);
+  records = idx === -1 ? [record, ...records].slice(0, MAX_RECORDS) : records.map((r) => (r.id === record.id ? record : r));
+  for (const l of listeners) l(records);
 }
 
 const INVESTIGATION_TOOLS = [
@@ -40,6 +56,25 @@ const INVESTIGATION_TOOLS = [
   inspectAlert,
   getRunbook,
 ];
+
+/** Wraps a tool's `execute` with the start/settle instrumentation above — shared by the real WebMCP registration and `testInvokeTool` below, so a manual test call exercises the identical code path a live agent's call would. */
+function instrument(tool: (typeof INVESTIGATION_TOOLS)[number]) {
+  return async (input: Record<string, unknown>) => {
+    const id = crypto.randomUUID();
+    const startedAt = Date.now();
+    const reason = typeof input.reason === "string" ? input.reason : undefined;
+    upsert({ id, tool: tool.name, args: input, reason, startedAt, settledAt: null });
+    try {
+      const result = await tool.execute(input);
+      upsert({ id, tool: tool.name, args: input, reason, startedAt, settledAt: Date.now(), result });
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      upsert({ id, tool: tool.name, args: input, reason, startedAt, settledAt: Date.now(), error: message });
+      throw err;
+    }
+  };
+}
 
 /**
  * Phase 3: the 12 read-only investigation tools from plan §6.3, registered
@@ -58,26 +93,27 @@ export function registerInvestigationTools(): () => void {
   const controller = new AbortController();
 
   for (const tool of INVESTIGATION_TOOLS) {
-    document.modelContext.registerTool(
-      {
-        ...tool,
-        execute: async (input: Record<string, unknown>) => {
-          const id = crypto.randomUUID();
-          const at = new Date().toISOString();
-          try {
-            const result = await tool.execute(input);
-            emit({ id, at, tool: tool.name, args: input, result });
-            return result;
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            emit({ id, at, tool: tool.name, args: input, result: null, error: message });
-            throw err;
-          }
-        },
-      },
-      { signal: controller.signal }
-    );
+    document.modelContext.registerTool({ ...tool, execute: instrument(tool) }, { signal: controller.signal });
   }
 
   return () => controller.abort();
+}
+
+/**
+ * Manual test hook, same spirit as Phase 0/3's manual test buttons: calls a
+ * tool by name through the exact same instrumented path a live agent's call
+ * takes (start/settle events, reason capture), for verifying the Phase 5
+ * reactivity contract without needing an LLM in the loop. Harmless to leave
+ * registered — it can only call the same 12 read-only, server-authorized
+ * tools any agent already can, and does nothing unless invoked from the
+ * browser console.
+ */
+export function testInvokeTool(name: string, input: Record<string, unknown> = {}): Promise<unknown> {
+  const tool = INVESTIGATION_TOOLS.find((t) => t.name === name);
+  if (!tool) return Promise.reject(new Error(`No investigation tool named "${name}".`));
+  return instrument(tool)(input);
+}
+
+if (typeof window !== "undefined") {
+  (window as unknown as { icTestInvoke: typeof testInvokeTool }).icTestInvoke = testInvokeTool;
 }

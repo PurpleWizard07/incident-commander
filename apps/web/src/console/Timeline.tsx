@@ -1,8 +1,14 @@
 import { useState } from "react";
-import type { TimelineEvent } from "@incident-commander/shared";
+import type { TimelineEvent, Change } from "@incident-commander/shared";
 
-type Source = TimelineEvent["source"];
-const SOURCES: Source[] = ["system", "agent", "human"];
+type Source = TimelineEvent["source"] | "change";
+const SOURCES: Source[] = ["system", "agent", "human", "change"];
+
+interface MergedEntry {
+  at: string;
+  source: Source;
+  summary: string;
+}
 
 function sourceColor(source: Source): string {
   switch (source) {
@@ -10,12 +16,29 @@ function sourceColor(source: Source): string {
       return "var(--color-ic-accent)";
     case "human":
       return "var(--color-ic-healthy)";
+    case "change":
+      return "var(--color-ic-degraded)";
     default:
       return "var(--color-ic-text-dim)";
   }
 }
 
-export function Timeline({ events }: { events: TimelineEvent[] }) {
+/**
+ * Change entries are pinned onto the timeline unconditionally (plan §9:
+ * "change entries appear as pins on the timeline") — Phase 4 already loads
+ * them ambiently, so there is nothing to gate; `get_recent_changes`'s
+ * reactive effect (the panel glow) draws attention to pins already here.
+ */
+function mergeChanges(events: TimelineEvent[], changes: Change[]): MergedEntry[] {
+  const changeEntries: MergedEntry[] = changes.map((c) => ({
+    at: c.at,
+    source: "change",
+    summary: `${c.type} on ${c.service ?? "platform"}: ${c.summary}`,
+  }));
+  return [...events, ...changeEntries].sort((a, b) => a.at.localeCompare(b.at));
+}
+
+export function Timeline({ events, changes }: { events: TimelineEvent[]; changes: Change[] }) {
   const [filter, setFilter] = useState<Set<Source>>(new Set(SOURCES));
 
   function toggle(s: Source) {
@@ -27,7 +50,8 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
     });
   }
 
-  const visible = [...events].reverse().filter((e) => filter.has(e.source));
+  const merged = mergeChanges(events, changes);
+  const visible = [...merged].reverse().filter((e) => filter.has(e.source));
 
   return (
     <div className="flex h-full flex-col">

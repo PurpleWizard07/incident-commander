@@ -3,6 +3,7 @@ import { Nav } from "./Nav.js";
 import { IncidentWorkspace } from "./IncidentWorkspace.js";
 import { AgentActivityRail } from "./AgentActivityRail.js";
 import { useConsoleData } from "./useConsoleData.js";
+import { ToolActivityProvider } from "./toolActivity.js";
 
 /**
  * Layout from plan §13.1: header, left nav, incident workspace, permanent
@@ -13,17 +14,19 @@ export function AppShell() {
   const data = useConsoleData();
 
   return (
-    <div className="flex h-screen flex-col bg-ic-bg text-ic-text">
-      <Header scenarioId={data.scenarioId || undefined} role={data.role} nowMinute={data.nowMinute || undefined} />
-      <div className="grid min-h-0 flex-1 grid-cols-[180px_1fr_340px]">
-        <Nav />
-        <main className="min-h-0 min-w-0">
-          <IncidentWorkspace data={data} />
-        </main>
-        <aside className="min-h-0 border-l border-ic-border">
-          <AgentActivityRail />
-        </aside>
+    <ToolActivityProvider>
+      <div className="flex h-screen flex-col bg-ic-bg text-ic-text">
+        <Header scenarioId={data.scenarioId || undefined} role={data.role} nowMinute={data.nowMinute || undefined} />
+        <div className="grid min-h-0 flex-1 grid-cols-[180px_1fr_340px]">
+          <Nav />
+          <main className="min-h-0 min-w-0">
+            <IncidentWorkspace data={data} />
+          </main>
+          <aside className="min-h-0 border-l border-ic-border">
+            <AgentActivityRail />
+          </aside>
+        </div>
       </div>
-    </div>
+    </ToolActivityProvider>
   );
 }

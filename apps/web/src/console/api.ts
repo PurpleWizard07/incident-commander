@@ -118,6 +118,41 @@ export function getMetricSeries(opts: {
   });
 }
 
+export interface MetricCompareResult {
+  service: ServiceId;
+  metric: MetricName;
+  present: boolean;
+  baseline?: number;
+  current?: number;
+  onsetMinute?: number | null;
+}
+
+export interface CompareMetricsResponse {
+  results: MetricCompareResult[];
+  orderedByOnset: { service: ServiceId; metric: MetricName; onsetMinute: number }[];
+  note?: string;
+}
+
+/**
+ * Same endpoint `compare_metrics` (the WebMCP tool) calls — the console
+ * reuses it to draw onset markers when reacting to that tool's calls
+ * (plan §9: "compared series are drawn together with onset markers"),
+ * rather than re-deriving onset logic client-side.
+ */
+export function compareMetrics(opts: {
+  services?: string[];
+  metrics?: string[];
+  fromMinute?: number;
+  toMinute?: number;
+}): Promise<CompareMetricsResponse> {
+  return apiGet("/api/metrics/compare", {
+    services: opts.services?.join(","),
+    metrics: opts.metrics?.join(","),
+    fromMinute: opts.fromMinute?.toString(),
+    toMinute: opts.toMinute?.toString(),
+  });
+}
+
 export interface StatePollResult {
   seq: number;
   nowMinute: number;

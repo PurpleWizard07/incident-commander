@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { List, type RowComponentProps } from "react-window";
+import { useEffect, useRef, useState } from "react";
+import { List, useListRef, type RowComponentProps } from "react-window";
 import type { LogEntry, Trace, Deployment, Change } from "@incident-commander/shared";
+import { useGlowingCall, type GlowingCall } from "./toolActivity.js";
 
 type Tab = "logs" | "traces" | "deployments" | "changes";
 
@@ -18,13 +19,29 @@ function levelColor(level: LogEntry["level"]): string {
   }
 }
 
-function LogRow({ index, style, ariaAttributes, logs }: RowComponentProps<{ logs: LogEntry[] }>) {
+interface LogQuery {
+  service?: string;
+  level?: string;
+  contains?: string;
+}
+
+function matchesLogQuery(l: LogEntry, q: LogQuery): boolean {
+  if (q.service && l.service !== q.service) return false;
+  if (q.level && l.level !== q.level) return false;
+  if (q.contains && !l.message.toLowerCase().includes(q.contains.toLowerCase())) return false;
+  return true;
+}
+
+function LogRow({ index, style, ariaAttributes, logs, highlightQuery }: RowComponentProps<{ logs: LogEntry[]; highlightQuery: LogQuery | null }>) {
   const l = logs[index];
+  const matched = highlightQuery !== null && matchesLogQuery(l, highlightQuery);
   return (
     <div
       style={style}
       {...ariaAttributes}
-      className="flex items-center gap-2 truncate px-2 font-mono text-[11px]"
+      className={`flex items-center gap-2 truncate border-l-2 px-2 font-mono text-[11px] ${
+        matched ? "border-ic-accent bg-ic-panel-2" : "border-transparent"
+      }`}
       title={l.message}
     >
       <span className="shrink-0 text-ic-text-dim">{l.timestamp.slice(11, 19)}</span>
@@ -37,9 +54,21 @@ function LogRow({ index, style, ariaAttributes, logs }: RowComponentProps<{ logs
   );
 }
 
-function TraceRow({ trace }: { trace: Trace }) {
+interface TraceQuery {
+  service?: string;
+  status?: string;
+}
+
+function matchesTraceQuery(t: Trace, q: TraceQuery): boolean {
+  if (q.status && q.status !== "any" && t.status !== q.status) return false;
+  if (q.service && !t.spans.some((s) => s.service === q.service)) return false;
+  return true;
+}
+
+function TraceRow({ trace, highlightQuery }: { trace: Trace; highlightQuery: TraceQuery | null }) {
+  const matched = highlightQuery !== null && matchesTraceQuery(trace, highlightQuery);
   return (
-    <div className="border-b border-ic-border px-2 py-1.5">
+    <div className={`border-b border-l-2 border-ic-border px-2 py-1.5 ${matched ? "border-l-ic-accent bg-ic-panel-2" : "border-l-transparent"}`}>
       <div className="flex items-center justify-between font-mono text-[11px] text-ic-text-dim">
         <span>
           {trace.traceId} · {trace.rootService} · {trace.durationMs}ms
@@ -76,6 +105,14 @@ function TraceRow({ trace }: { trace: Trace }) {
   );
 }
 
+/** Picks whichever of this tab's tools has the most recently started call. */
+function latestOf(candidates: Array<{ tab: Tab; glow: GlowingCall | null }>): Tab | null {
+  const present = candidates.filter((c): c is { tab: Tab; glow: GlowingCall } => c.glow !== null);
+  if (present.length === 0) return null;
+  present.sort((a, b) => b.glow.record.startedAt - a.glow.record.startedAt);
+  return present[0].tab;
+}
+
 export function EvidenceTabs({
   logs,
   logsNote,
@@ -92,6 +129,47 @@ export function EvidenceTabs({
   changes: Change[];
 }) {
   const [tab, setTab] = useState<Tab>("logs");
+
+  // Reactivity contract (plan §9): each of these tools "opens" its evidence
+  // tab and highlights what it queried for. Evidence itself is always loaded
+  // (Phase 4) — the tool call only draws attention to the relevant subset.
+  const logsGlow = useGlowingCall(["query_logs"]);
+  const tracesGlow = useGlowingCall(["search_traces"]);
+  const deploysGlow = useGlowingCall(["get_recent_deployments"]);
+  const changesGlow = useGlowingCall(["get_recent_changes"]);
+
+  const appliedTabCallId = useRef<string | null>(null);
+  useEffect(() => {
+    const candidates = [
+      { tab: "logs" as const, glow: logsGlow },
+      { tab: "traces" as const, glow: tracesGlow },
+      { tab: "deployments" as const, glow: deploysGlow },
+      { tab: "changes" as const, glow: changesGlow },
+    ];
+    const winner = latestOf(candidates);
+    const winnerGlow = candidates.find((c) => c.tab === winner)?.glow;
+    if (winner && winnerGlow && winnerGlow.record.id !== appliedTabCallId.current) {
+      appliedTabCallId.current = winnerGlow.record.id;
+      setTab(winner);
+    }
+  }, [logsGlow, tracesGlow, deploysGlow, changesGlow]);
+
+  const logQuery: LogQuery | null = logsGlow ? (logsGlow.record.args as LogQuery) : null;
+  const traceQuery: TraceQuery | null = tracesGlow ? (tracesGlow.record.args as TraceQuery) : null;
+  const deployHighlightService = deploysGlow?.record.args.service as string | undefined;
+  const changeHighlightService = changesGlow?.record.args.service as string | undefined;
+
+  // A highlighted-but-off-screen match isn't really "visible" — scroll the
+  // first match into view whenever a new query_logs call settles.
+  const listRef = useListRef(null);
+  const scrolledForCallId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!logQuery || !logsGlow || logsGlow.record.id === scrolledForCallId.current) return;
+    const index = logs.findIndex((l) => matchesLogQuery(l, logQuery));
+    if (index === -1) return;
+    scrolledForCallId.current = logsGlow.record.id;
+    listRef.current?.scrollToRow({ index, align: "center", behavior: "smooth" });
+  }, [logQuery, logsGlow, logs, listRef]);
 
   return (
     <div className="flex h-full flex-col">
@@ -114,10 +192,11 @@ export function EvidenceTabs({
             <EmptyNote text={logsNote ?? "No log lines."} />
           ) : (
             <List
+              listRef={listRef}
               rowComponent={LogRow}
               rowCount={logs.length}
               rowHeight={LOG_ROW_HEIGHT}
-              rowProps={{ logs }}
+              rowProps={{ logs, highlightQuery: logQuery }}
               style={{ height: "100%" }}
             />
           ))}
@@ -127,7 +206,7 @@ export function EvidenceTabs({
           ) : (
             <div className="h-full overflow-y-auto">
               {traces.map((t) => (
-                <TraceRow key={t.traceId} trace={t} />
+                <TraceRow key={t.traceId} trace={t} highlightQuery={traceQuery} />
               ))}
             </div>
           ))}
@@ -135,17 +214,20 @@ export function EvidenceTabs({
           <div className="h-full overflow-y-auto font-mono text-[11px]">
             <table className="w-full">
               <tbody>
-                {deployments.map((d) => (
-                  <tr key={d.id} className="border-b border-ic-border">
-                    <td className="px-2 py-1 text-ic-text-dim">{d.deployedAt.slice(0, 16).replace("T", " ")}</td>
-                    <td className="px-2 py-1">{d.service}</td>
-                    <td className="px-2 py-1">{d.version}</td>
-                    <td className="px-2 py-1 text-ic-text-dim">{d.riskScore}</td>
-                    <td className="max-w-[240px] truncate px-2 py-1 text-ic-text-dim" title={d.commitMessage}>
-                      {d.commitMessage}
-                    </td>
-                  </tr>
-                ))}
+                {deployments.map((d) => {
+                  const matched = deploysGlow !== null && (!deployHighlightService || d.service === deployHighlightService);
+                  return (
+                    <tr key={d.id} className={`border-b border-l-2 border-ic-border ${matched ? "border-l-ic-accent bg-ic-panel-2" : "border-l-transparent"}`}>
+                      <td className="px-2 py-1 text-ic-text-dim">{d.deployedAt.slice(0, 16).replace("T", " ")}</td>
+                      <td className="px-2 py-1">{d.service}</td>
+                      <td className="px-2 py-1">{d.version}</td>
+                      <td className="px-2 py-1 text-ic-text-dim">{d.riskScore}</td>
+                      <td className="max-w-[240px] truncate px-2 py-1 text-ic-text-dim" title={d.commitMessage}>
+                        {d.commitMessage}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -154,16 +236,19 @@ export function EvidenceTabs({
           <div className="h-full overflow-y-auto font-mono text-[11px]">
             <table className="w-full">
               <tbody>
-                {changes.map((c) => (
-                  <tr key={c.id} className="border-b border-ic-border">
-                    <td className="px-2 py-1 text-ic-text-dim">{c.at.slice(0, 16).replace("T", " ")}</td>
-                    <td className="px-2 py-1">{c.type}</td>
-                    <td className="px-2 py-1">{c.service ?? "—"}</td>
-                    <td className="max-w-[280px] truncate px-2 py-1 text-ic-text-dim" title={c.summary}>
-                      {c.summary}
-                    </td>
-                  </tr>
-                ))}
+                {changes.map((c) => {
+                  const matched = changesGlow !== null && (!changeHighlightService || c.service === changeHighlightService);
+                  return (
+                    <tr key={c.id} className={`border-b border-l-2 border-ic-border ${matched ? "border-l-ic-accent bg-ic-panel-2" : "border-l-transparent"}`}>
+                      <td className="px-2 py-1 text-ic-text-dim">{c.at.slice(0, 16).replace("T", " ")}</td>
+                      <td className="px-2 py-1">{c.type}</td>
+                      <td className="px-2 py-1">{c.service ?? "—"}</td>
+                      <td className="max-w-[280px] truncate px-2 py-1 text-ic-text-dim" title={c.summary}>
+                        {c.summary}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

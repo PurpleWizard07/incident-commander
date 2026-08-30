@@ -4,6 +4,8 @@ import { Topology } from "./Topology.js";
 import { MetricsChart } from "./MetricsChart.js";
 import { EvidenceTabs } from "./EvidenceTabs.js";
 import { Timeline } from "./Timeline.js";
+import { EvidenceSpotlight } from "./EvidenceSpotlight.js";
+import { useGlowingCall } from "./toolActivity.js";
 import type { ConsoleData } from "./useConsoleData.js";
 
 function severityColor(severity: string): string {
@@ -12,9 +14,13 @@ function severityColor(severity: string): string {
   return "var(--color-ic-text-dim)";
 }
 
-function IncidentHeader({ incident }: { incident: Incident }) {
+function IncidentHeader({ incident, glowing }: { incident: Incident; glowing: boolean }) {
   return (
-    <div className="flex h-14 shrink-0 items-center gap-3 border-b border-ic-border px-3">
+    <div
+      className={`flex h-14 shrink-0 items-center gap-3 border-b px-3 transition-colors duration-300 ${
+        glowing ? "border-ic-accent bg-ic-panel-2" : "border-ic-border"
+      }`}
+    >
       <span className="font-mono text-sm font-semibold text-ic-text">{incident.id}</span>
       <span className="text-sm text-ic-text-dim">{incident.title}</span>
       <span
@@ -47,11 +53,27 @@ export function IncidentWorkspace({ data }: { data: ConsoleData }) {
     );
   }
 
+  return <Loaded data={data} incident={data.incident} />;
+}
+
+/**
+ * Split out so the panel-level glow hooks (plan §9's "which section is the
+ * agent's most recent call about") only run once an incident actually
+ * exists — hooks can't be conditional, and the loading/error branches above
+ * return before any incident is available.
+ */
+function Loaded({ data, incident }: { data: ConsoleData; incident: Incident }) {
+  const headerGlow = useGlowingCall(["get_active_incidents", "get_incident"]);
+  const topologyGlow = useGlowingCall(["get_service_health", "get_service_dependencies"]);
+  const metricsGlow = useGlowingCall(["get_recent_deployments", "compare_metrics"]);
+  const evidenceGlow = useGlowingCall(["query_logs", "search_traces", "get_recent_deployments", "get_recent_changes"]);
+  const timelineGlow = useGlowingCall(["get_incident", "get_incident_timeline", "get_recent_changes"]);
+
   return (
-    <div className="flex h-full flex-col">
-      <IncidentHeader incident={data.incident} />
+    <div className="relative flex h-full flex-col">
+      <IncidentHeader incident={incident} glowing={headerGlow !== null} />
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-        <Panel title="TOPOLOGY" className="h-72 shrink-0">
+        <Panel title="TOPOLOGY" className="h-72 shrink-0" glow={topologyGlow && (topologyGlow.pending ? "pending" : "settled")}>
           {Object.keys(data.serviceHealth).length === 0 ? (
             <div className="flex h-full items-center justify-center">
               <Skeleton className="h-56 w-full" />
@@ -61,7 +83,7 @@ export function IncidentWorkspace({ data }: { data: ConsoleData }) {
           )}
         </Panel>
 
-        <Panel title="METRICS" className="h-72 shrink-0">
+        <Panel title="METRICS" className="h-72 shrink-0" glow={metricsGlow && (metricsGlow.pending ? "pending" : "settled")}>
           {data.metricSeries.length === 0 ? (
             <div className="flex h-full items-center justify-center">
               <Skeleton className="h-56 w-full" />
@@ -71,7 +93,7 @@ export function IncidentWorkspace({ data }: { data: ConsoleData }) {
           )}
         </Panel>
 
-        <Panel title="EVIDENCE" className="h-80 shrink-0">
+        <Panel title="EVIDENCE" className="h-80 shrink-0" glow={evidenceGlow && (evidenceGlow.pending ? "pending" : "settled")}>
           <EvidenceTabs
             logs={data.logs}
             logsNote={data.logsNote}
@@ -82,10 +104,11 @@ export function IncidentWorkspace({ data }: { data: ConsoleData }) {
           />
         </Panel>
 
-        <Panel title="TIMELINE" className="h-56 shrink-0">
-          <Timeline events={data.incident.timeline} />
+        <Panel title="TIMELINE" className="h-56 shrink-0" glow={timelineGlow && (timelineGlow.pending ? "pending" : "settled")}>
+          <Timeline events={incident.timeline} changes={data.changes} />
         </Panel>
       </div>
+      <EvidenceSpotlight />
     </div>
   );
 }
