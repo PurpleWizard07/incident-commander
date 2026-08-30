@@ -8,3 +8,8 @@ dist/
 *.tsbuildinfo
 /.netlify/
 deno.lock
+
+# Local planning/tracking docs — kept on disk for cross-session memory, never pushed.
+# README.md is the only markdown file this repo tracks in git.
+*.md
+!README.md

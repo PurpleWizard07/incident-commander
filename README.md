@@ -7,8 +7,8 @@ deployments, logs, traces, metrics — while a human responder watches the same 
 same console. Production-changing actions (rollback, restart, scale, feature flags) require
 human approval, enforced server-side.
 
-**Status:** early build (Phase 0 of 12 — see `phase-summary.md`). This README will be filled in
-properly in Phase 11; for now, see `implementation-plan.md` for the full design.
+**Status:** early build, in progress for the WebMCP Challenge. This README will be filled in
+properly closer to submission with the full design, architecture, and setup instructions.
 
 ## Local development
 
