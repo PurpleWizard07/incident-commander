@@ -5,7 +5,12 @@ through structured WebMCP tools while the human watches the same evidence in the
 authority over production changes.
 
 **Deadline: 2026-09-03, 1:00 pm PT.** Judges test the live URL in ChatGPT's in-app browser or
-Chrome 156.
+Chrome with `chrome://flags/#enable-webmcp-testing` enabled — per the hackathon's own rules, no
+specific version. ("Chrome 156" in earlier notes meant the top of the origin trial's supported
+range, 149–156, not a version to target — stable Chrome was at 152 as of 2026-08-31 and will not
+reach 156 before the deadline. The trial itself runs through 2026-11-17, well past submission.)
+Chrome ships no built-in chat agent yet, so testing tool execution natively needs the
+**Model Context Protocol Inspector extension** (Execute Tool = manual call, no LLM needed).
 
 ## Read these, in this order
 
