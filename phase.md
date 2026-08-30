@@ -71,14 +71,37 @@ the trial itself is valid through 2026-11-17 regardless.
 - Unit tests: determinism, evidence integrity, the correlation contract.
 
 **Done when:**
-- [ ] Same `(scenario, seed)` produces byte-identical output across 100 runs.
-- [ ] INC-4821's evidence satisfies its `groundTruth` — failing spans, log patterns, onset ordering.
-- [ ] `compare_metrics`-style onset calculation puts error onset *after* the deploy.
-- [ ] `rollback_deployment(checkout, checkout-v3)` produces full recovery; every other action
-      produces `no_effect`.
-- [ ] No output anywhere contains `scenarioId` or `groundTruth`.
+- [x] Same `(scenario, seed)` produces byte-identical output across 100 runs.
+- [x] Output is also a **stable prefix** as `nowMinute` grows — a past point never changes value on
+      a later poll. (Found and fixed during Phase 1: a single rng shared across metric series /
+      log templates / trace shapes let one series' minute-range steal a nowMinute-dependent number
+      of draws before the next one started, corrupting *its* determinism too. Fix: each series /
+      template / shape now gets its own independently-seeded rng stream, keyed by what it
+      generates. See phase-summary.md decisions log — this was a real engine bug, not a test bug.)
+- [x] INC-4821's evidence satisfies its `groundTruth` — failing spans, log patterns, onset ordering.
+- [x] `compare_metrics`-style onset calculation puts error onset *after* the deploy, and puts
+      payments' onset strictly after checkout's — the falsifiable "don't blame payments" property.
+- [x] `rollback_deployment(checkout, checkout-v3)` produces `full_recovery`. The **other** explicit
+      rules in §5.1's table produce what that table specifies — `rejected` for the two structurally
+      impossible actions (rollback payments, disable a nonexistent flag), `no_effect` for the rest.
+      (Correction to this line's original wording: "every other action → no_effect" was my own
+      shorthand and lost the rejected/no_effect distinction the plan's remediation table — and its
+      own §7 approval-flow reasoning — actually depends on. Implemented per the detailed table, not
+      per this line's earlier paraphrase.)
+- [x] No individual generated record (metric point, log entry, trace/span, deployment, change,
+      alert) contains a `groundTruth` field or an embedded `scenarioId`. (Precision fix to this
+      line's original wording: `World.scenarioId` itself is legitimate engine-internal bookkeeping —
+      a materialized world has to know which scenario it is — and is not yet a tool/API response,
+      since no such layer exists until Phase 2/3. What must never leak is a *response*; Phase 2/3
+      must not copy `scenarioId`/`groundTruth` into one.)
 
 **Do not:** write scenarios 2–5 yet. Do not touch React.
+
+**Done.** `packages/sim` — prng.ts, clock.ts, types.ts, generators/{metrics,logs,traces,deployments}.ts,
+scenarios/hero-checkout.ts, world.ts, remediation.ts. 30 tests across 5 files, all passing:
+determinism (incl. the prefix-stability fix above), evidence-integrity, correlation-contract,
+remediation, shapes (all 6 phase shapes unit-tested even though the hero scenario only exercises
+`step`/`noise_only` — de-risks Phase 8, which must add scenarios as pure data with no engine changes).
 
 ---
 

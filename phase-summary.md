@@ -9,11 +9,11 @@ the plan describes intent, this describes what actually happened.
 
 ## NEXT ACTION
 
-> **Phase 0 — done. Start Phase 1 (simulation core).** Both required surfaces verified: ChatGPT
-> in-app browser (exact data match) and Chrome + flag (via the Model Context Protocol Inspector
-> extension's Execute Tool). Origin trial token registration is in progress in parallel — not a
-> blocker, wire it in via `apps/web/index.html` whenever the token arrives. Read plan §3 and §4
-> before starting Phase 1.
+> **Phase 1 — done. Start Phase 2 (backend and store).** `packages/sim` builds the hero incident
+> deterministically; 30 tests pass. Phase 2 wires this engine behind real Netlify Functions on
+> Netlify Blobs (event-sourced, per plan §2.1/§2.2 — no SQLite, no SSE). Read plan §2.1, §2.2,
+> §3.10, §3.11, §11, §12 before starting. No human input needed for this phase — it's all backend
+> code, verifiable with curl.
 
 **Live URL:** https://incident-commander-461.netlify.app
 **Repo:** https://github.com/PurpleWizard07/incident-commander
@@ -58,7 +58,7 @@ deploys once Netlify is authenticated — Claude can do unattended.
 | # | Phase | Status | Commit | Notes |
 |---|---|---|---|---|
 | 0 | Proof (go/no-go) | ✅ done | `2e13f94`..`5f82e12` | ChatGPT in-app browser + Chrome (flag, via Inspector extension) verified by user; origin trial token registered, decoded, wired in, and live on production |
-| 1 | Simulation core | ⬜ not started | — | |
+| 1 | Simulation core | ✅ done | `(pending commit)` | 30/30 tests pass. Found and fixed a real determinism bug — see decisions log |
 | 2 | Backend and store | ⬜ not started | — | |
 | 3 | Investigation tool surface | ⬜ not started | — | |
 | 4 | Console shell | ⬜ not started | — | |
@@ -93,6 +93,10 @@ One line each: what was decided, and why.
 | 2026-08-30 | 0 | Manual deploys from this repo **require** `--filter @incident-commander/web` on every `netlify` CLI command, and `--functions` must be an **absolute path** | See Known Issues below — this is a real gotcha that will bite again on every future deploy unless a future session reads this |
 | 2026-08-31 | 0 | **Stop targeting "Chrome 156" as a specific version anywhere.** Corrected in CLAUDE.md and phase.md. | User's screenshot of the origin trial registration form showed stable Chrome was at v152 on this date, with the trial covering v149–156 and running through **2026-11-17** — a fixed end date well past our deadline. "156" was always just the top of that range, never a version to chase; the hackathon's own rules only ever said "Chrome with the flag enabled," no version. A future session must not waste time hunting for Chrome 156 |
 | 2026-08-31 | 0 | **The Model Context Protocol Inspector extension is the primary way to test Chrome-side, not a fallback.** Documented in CLAUDE.md, phase.md, and "What needs you" above. | Chrome ships no built-in chat agent yet (Gemini-in-Chrome WebMCP support is announced, not shipped, as of this date). Its "Execute Tool" mode manually calls a registered tool — proving registration/execution without needing any LLM in the loop at all |
+| 2026-08-31 | 1 | **Every metric series, log template, and trace shape gets its OWN independently-seeded `Rng`, derived via `deriveSeed(id, baseSeed)` — never one shared `Rng` threaded sequentially across all of them.** Enforced in `world.ts`, `generators/logs.ts`, `generators/traces.ts`. `LogTemplate` and `TraceShape` both carry a stable `id` field specifically to seed this. | **This was a real engine bug, caught by the phase's own determinism test, not a test-writing mistake.** With one shared rng, generating up to `nowMinute=50` vs `nowMinute=93` consumed a *different number* of draws in every series/template/shape that ran before the one being checked (since each one's minute-range depends on `nowMinute`) — so a later series' values silently depended on how far an earlier, unrelated one had been asked to generate. Concretely: a past log's displayed timestamp changed value depending on what *future* minute the world was asked to materialize. For a live-polling product (plan §2.2) this would mean a chart re-jitters data the user already saw, on every poll — exactly the kind of thing that undermines the "shared context" reactivity thesis. Only the trace generator's single-shape hero scenario masked this from showing up there; Phase 8 will add more shapes and templates, so this had to be fixed at the engine level now, not patched around |
+| 2026-08-31 | 1 | Domain model types (`Service`, `Deployment`, `MetricSeries`, `LogEntry`, `Trace`/`Span`, `Change`, `Alert`) live in `packages/shared`, not `packages/sim`. Generation-only types (`Phase`, `LogTemplate`, `TraceShape`, `Scenario`, `RemediationRule`) live in `packages/sim`. | Matches plan §16's own description of the two packages ("shared by web and api" vs "engine, scenarios, generators") — the API (Phase 2) and eventually the web console need the domain types without pulling in the whole generation engine |
+| 2026-08-31 | 1 | A `Phase`'s `toMinute` uses the literal constant `FOREVER = 100_000` (minutes) for "holds indefinitely," rather than making the field nullable. | Keeps the `Phase` interface identical to plan §4.4's — `toMinute: number`, non-nullable. A scenario doesn't know `nowMinute` in advance (that's a runtime query parameter), so "holds until superseded" needs *some* sentinel; a very large constant was simpler than adding nullability that would ripple into the shape evaluator |
+| 2026-08-31 | 1 | `T0` is the **fixed** constant `SIM_EPOCH_ISO = "2026-08-30T09:19:00.000Z"` in `clock.ts` — never derived from `Date.now()`. | Determinism requires the same `(scenario, seed)` to produce byte-identical output regardless of what day it's actually run on. A wall-clock-derived T0 would still be "deterministic" within one run but would change the ISO timestamps (and therefore the JSON) on every different day — failing the "same output across 100 runs, and across a week" property the plan's determinism test actually cares about. The epoch's calendar date is flavor text only |
 
 Examples of what belongs here: naming schemes, library version pins that mattered, a workaround for
 browser behaviour, a data-shape change, anything where a reasonable person would have chosen
