@@ -1,10 +1,45 @@
 import type { ServiceId, MetricName, MetricSeries } from "./sharedTypes.js";
 import { SERVICE_IDS } from "./sharedTypes.js";
 import { Rng, deriveSeed } from "./prng.js";
-import type { Scenario, World } from "./types.js";
+import type { RecoveryCurve, Scenario, World } from "./types.js";
 import { buildMetricSeries } from "./generators/metrics.js";
 import { generateTraces, indexTraceIdsByServiceMinute } from "./generators/traces.js";
 import { generateLogs } from "./generators/logs.js";
+
+/**
+ * A gated action's effect, applied on top of the scenario's own (unaware of
+ * any action ever having been taken) metric generation — see Phase 6 in
+ * phase-summary.md for why this is a post-processing blend rather than an
+ * engine-native concept: scenario phases are static data, authored once, with
+ * no notion of "the agent did something." `services` (not just the one
+ * target service) is deliberate — the hero scenario's own approval-card copy
+ * says "payments recovers in tandem," and the underlying phases model
+ * payments' spike as fully independent of checkout's, so nothing would
+ * cascade without this.
+ */
+export interface AppliedRemediation {
+  services: ServiceId[];
+  metric: MetricName;
+  appliedAtMinute: number;
+  recoveryCurve: RecoveryCurve;
+}
+
+/**
+ * Blends a series from its natural (un-remediated) value at `appliedAtMinute`
+ * toward `baseline * targetMultiplier`, linearly over `toMinutes`, holding at
+ * the target afterward. Only touches points at or after `appliedAtMinute` —
+ * everything before is exactly what the agent already observed and must
+ * never change (the same prefix-stability guarantee documented below).
+ */
+function applyRecovery(series: MetricSeries, appliedAtMinute: number, curve: RecoveryCurve): MetricSeries {
+  const target = series.baseline * curve.targetMultiplier;
+  const points = series.points.map((p) => {
+    if (p.minute < appliedAtMinute) return p;
+    const t = Math.min(1, (p.minute - appliedAtMinute) / Math.max(1, curve.toMinutes));
+    return { ...p, value: Math.max(0, p.value + (target - p.value) * t) };
+  });
+  return { ...series, points };
+}
 
 const ALL_METRIC_NAMES: MetricName[] = [
   "request_rate",
@@ -50,7 +85,12 @@ function inferBaseline(scenario: Scenario, service: ServiceId, metric: MetricNam
   return first ? first.from : 0;
 }
 
-export function materializeWorld(scenario: Scenario, seed: number, nowMinute: number): World {
+export function materializeWorld(
+  scenario: Scenario,
+  seed: number,
+  nowMinute: number,
+  remediation?: AppliedRemediation
+): World {
   const fromMinute = 0;
 
   // Each series/generator gets its OWN independently-seeded rng stream, keyed by
@@ -78,7 +118,9 @@ export function materializeWorld(scenario: Scenario, seed: number, nowMinute: nu
         nowMinute,
         seriesRng
       );
-      if (series) metrics.push(series);
+      if (!series) continue;
+      const shouldRecover = remediation && remediation.metric === metric && remediation.services.includes(service);
+      metrics.push(shouldRecover ? applyRecovery(series, remediation.appliedAtMinute, remediation.recoveryCurve) : series);
     }
   }
 

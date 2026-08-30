@@ -1,7 +1,7 @@
 import type { ServiceId, MetricName } from "../sharedTypes.js";
 import { SERVICE_IDS } from "../sharedTypes.js";
 import { materializeWorld, getScenario, findOnsetMinute } from "../simEngine.js";
-import type { SessionState } from "../store/session.js";
+import { appliedRemediationFor, type SessionState } from "../store/session.js";
 
 function isServiceId(v: string): v is ServiceId {
   return (SERVICE_IDS as string[]).includes(v);
@@ -14,7 +14,7 @@ export function queryLogs(
   if (opts.service && !isServiceId(opts.service)) {
     return { status: 400, body: { error: `Unknown service "${opts.service}".` } };
   }
-  const world = materializeWorld(getScenario(session.scenarioId), session.seed, session.nowMinute);
+  const world = materializeWorld(getScenario(session.scenarioId), session.seed, session.nowMinute, appliedRemediationFor(session));
   const limit = Math.min(200, opts.limit ? Number(opts.limit) : 50);
   const fromMinute = opts.fromMinute ? Number(opts.fromMinute) : 0;
   const toMinute = opts.toMinute ? Number(opts.toMinute) : session.nowMinute;
@@ -52,7 +52,7 @@ export function searchTraces(session: SessionState, opts: { service: string | nu
   if (opts.service && !isServiceId(opts.service)) {
     return { status: 400, body: { error: `Unknown service "${opts.service}".` } };
   }
-  const world = materializeWorld(getScenario(session.scenarioId), session.seed, session.nowMinute);
+  const world = materializeWorld(getScenario(session.scenarioId), session.seed, session.nowMinute, appliedRemediationFor(session));
   const status = opts.status ?? "error";
   const limit = Math.min(50, opts.limit ? Number(opts.limit) : 20);
 
@@ -98,7 +98,7 @@ export function getMetricSeries(
   opts: { services: string[] | null; metrics: string[] | null; fromMinute: string | null; toMinute: string | null }
 ) {
   const scenario = getScenario(session.scenarioId);
-  const world = materializeWorld(scenario, session.seed, session.nowMinute);
+  const world = materializeWorld(scenario, session.seed, session.nowMinute, appliedRemediationFor(session));
 
   const defaultServices = session.incidents[0]?.affectedServices ?? SERVICE_IDS;
   const requestedServices = (opts.services?.filter(isServiceId) as ServiceId[] | undefined) ?? defaultServices;
@@ -130,7 +130,7 @@ export function compareMetrics(
   opts: { services: string[] | null; metrics: string[] | null; fromMinute: string | null; toMinute: string | null }
 ) {
   const scenario = getScenario(session.scenarioId);
-  const world = materializeWorld(scenario, session.seed, session.nowMinute);
+  const world = materializeWorld(scenario, session.seed, session.nowMinute, appliedRemediationFor(session));
 
   // Plan §6.3: "Omit for all affected services" — the incident's affected
   // services, not literally every service in the system. Falls back to

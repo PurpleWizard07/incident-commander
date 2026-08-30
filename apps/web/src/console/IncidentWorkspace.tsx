@@ -79,7 +79,7 @@ function Loaded({ data, incident }: { data: ConsoleData; incident: Incident }) {
               <Skeleton className="h-56 w-full" />
             </div>
           ) : (
-            <Topology health={data.serviceHealth} />
+            <Topology health={data.serviceHealth} transitioningServices={incident.state === "RECOVERING" ? incident.affectedServices : []} />
           )}
         </Panel>
 

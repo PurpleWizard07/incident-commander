@@ -1,7 +1,7 @@
 import { SERVICE_IDS, SERVICES } from "../sharedTypes.js";
 import type { ServiceId } from "../sharedTypes.js";
 import { materializeWorld, getScenario } from "../simEngine.js";
-import type { SessionState } from "../store/session.js";
+import { appliedRemediationFor, type SessionState } from "../store/session.js";
 
 function isServiceId(value: string): value is ServiceId {
   return (SERVICE_IDS as string[]).includes(value);
@@ -11,7 +11,7 @@ export function getServiceHealth(session: SessionState, serviceId: string) {
   if (!isServiceId(serviceId)) {
     return { status: 400, body: { error: `Unknown service "${serviceId}". Valid: ${SERVICE_IDS.join(", ")}.` } };
   }
-  const world = materializeWorld(getScenario(session.scenarioId), session.seed, session.nowMinute);
+  const world = materializeWorld(getScenario(session.scenarioId), session.seed, session.nowMinute, appliedRemediationFor(session));
   const errSeries = world.metrics.find((m) => m.service === serviceId && m.metric === "error_rate");
   const latSeries = world.metrics.find((m) => m.service === serviceId && m.metric === "latency_p95");
   const live = world.services[serviceId];

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { List, useListRef, type RowComponentProps } from "react-window";
-import type { LogEntry, Trace, Deployment, Change } from "@incident-commander/shared";
+import type { LogEntry, Trace, Deployment, Change, EvidenceRef } from "@incident-commander/shared";
 import { useGlowingCall, type GlowingCall } from "./toolActivity.js";
+import { useEvidenceJump } from "./evidenceJump.js";
 
 type Tab = "logs" | "traces" | "deployments" | "changes";
 
@@ -65,10 +66,13 @@ function matchesTraceQuery(t: Trace, q: TraceQuery): boolean {
   return true;
 }
 
-function TraceRow({ trace, highlightQuery }: { trace: Trace; highlightQuery: TraceQuery | null }) {
-  const matched = highlightQuery !== null && matchesTraceQuery(trace, highlightQuery);
+function TraceRow({ trace, highlightQuery, jumped }: { trace: Trace; highlightQuery: TraceQuery | null; jumped: boolean }) {
+  const matched = jumped || (highlightQuery !== null && matchesTraceQuery(trace, highlightQuery));
   return (
-    <div className={`border-b border-l-2 border-ic-border px-2 py-1.5 ${matched ? "border-l-ic-accent bg-ic-panel-2" : "border-l-transparent"}`}>
+    <div
+      id={`evidence-trace-${trace.traceId}`}
+      className={`border-b border-l-2 border-ic-border px-2 py-1.5 ${matched ? "border-l-ic-accent bg-ic-panel-2" : "border-l-transparent"}`}
+    >
       <div className="flex items-center justify-between font-mono text-[11px] text-ic-text-dim">
         <span>
           {trace.traceId} · {trace.rootService} · {trace.durationMs}ms
@@ -159,6 +163,28 @@ export function EvidenceTabs({
   const deployHighlightService = deploysGlow?.record.args.service as string | undefined;
   const changeHighlightService = changesGlow?.record.args.service as string | undefined;
 
+  // Approval-card evidence links (plan §10.2) — a human click, not a tool
+  // call, so it comes through a separate mechanism (see evidenceJump.tsx).
+  // "Clicking scrolls to that evidence": switch tab, then scroll the
+  // matching row (trace/deployment/change have stable ids to match against;
+  // log lines don't, so a log link just opens the tab).
+  const { jump } = useEvidenceJump();
+  const appliedJumpNonce = useRef<number | null>(null);
+  useEffect(() => {
+    if (!jump || jump.nonce === appliedJumpNonce.current) return;
+    appliedJumpNonce.current = jump.nonce;
+    const tabForKind: Partial<Record<EvidenceRef["kind"], Tab>> = { log: "logs", trace: "traces", deployment: "deployments", change: "changes" };
+    const target = tabForKind[jump.ref.kind];
+    if (target) setTab(target);
+    if (jump.ref.kind === "trace" || jump.ref.kind === "deployment" || jump.ref.kind === "change") {
+      const prefix = jump.ref.kind === "trace" ? "evidence-trace-" : jump.ref.kind === "deployment" ? "evidence-deployment-" : "evidence-change-";
+      setTimeout(() => document.getElementById(`${prefix}${jump.ref.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+    }
+  }, [jump]);
+  const jumpedTraceId = jump?.ref.kind === "trace" ? jump.ref.id : null;
+  const jumpedDeploymentId = jump?.ref.kind === "deployment" ? jump.ref.id : null;
+  const jumpedChangeId = jump?.ref.kind === "change" ? jump.ref.id : null;
+
   // A highlighted-but-off-screen match isn't really "visible" — scroll the
   // first match into view whenever a new query_logs call settles.
   const listRef = useListRef(null);
@@ -206,7 +232,7 @@ export function EvidenceTabs({
           ) : (
             <div className="h-full overflow-y-auto">
               {traces.map((t) => (
-                <TraceRow key={t.traceId} trace={t} highlightQuery={traceQuery} />
+                <TraceRow key={t.traceId} trace={t} highlightQuery={traceQuery} jumped={t.traceId === jumpedTraceId} />
               ))}
             </div>
           ))}
@@ -215,9 +241,13 @@ export function EvidenceTabs({
             <table className="w-full">
               <tbody>
                 {deployments.map((d) => {
-                  const matched = deploysGlow !== null && (!deployHighlightService || d.service === deployHighlightService);
+                  const matched = d.id === jumpedDeploymentId || (deploysGlow !== null && (!deployHighlightService || d.service === deployHighlightService));
                   return (
-                    <tr key={d.id} className={`border-b border-l-2 border-ic-border ${matched ? "border-l-ic-accent bg-ic-panel-2" : "border-l-transparent"}`}>
+                    <tr
+                      key={d.id}
+                      id={`evidence-deployment-${d.id}`}
+                      className={`border-b border-l-2 border-ic-border ${matched ? "border-l-ic-accent bg-ic-panel-2" : "border-l-transparent"}`}
+                    >
                       <td className="px-2 py-1 text-ic-text-dim">{d.deployedAt.slice(0, 16).replace("T", " ")}</td>
                       <td className="px-2 py-1">{d.service}</td>
                       <td className="px-2 py-1">{d.version}</td>
@@ -237,9 +267,13 @@ export function EvidenceTabs({
             <table className="w-full">
               <tbody>
                 {changes.map((c) => {
-                  const matched = changesGlow !== null && (!changeHighlightService || c.service === changeHighlightService);
+                  const matched = c.id === jumpedChangeId || (changesGlow !== null && (!changeHighlightService || c.service === changeHighlightService));
                   return (
-                    <tr key={c.id} className={`border-b border-l-2 border-ic-border ${matched ? "border-l-ic-accent bg-ic-panel-2" : "border-l-transparent"}`}>
+                    <tr
+                      key={c.id}
+                      id={`evidence-change-${c.id}`}
+                      className={`border-b border-l-2 border-ic-border ${matched ? "border-l-ic-accent bg-ic-panel-2" : "border-l-transparent"}`}
+                    >
                       <td className="px-2 py-1 text-ic-text-dim">{c.at.slice(0, 16).replace("T", " ")}</td>
                       <td className="px-2 py-1">{c.type}</td>
                       <td className="px-2 py-1">{c.service ?? "—"}</td>

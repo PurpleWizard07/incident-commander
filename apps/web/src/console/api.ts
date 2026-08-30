@@ -1,4 +1,4 @@
-import { apiGet } from "../webmcp/apiClient.js";
+import { apiGet, apiPost } from "../webmcp/apiClient.js";
 import type {
   ServiceId,
   ServiceStatus,
@@ -9,6 +9,8 @@ import type {
   Trace,
   Incident,
   TimelineEvent,
+  Approval,
+  ApprovalStatus,
 } from "@incident-commander/shared";
 
 export interface ActiveIncidentSummary {
@@ -160,10 +162,28 @@ export interface StatePollResult {
   scenarioId: string;
   /** Full `Incident` records, not the truncated shape `GET /api/incidents/:id` returns. */
   incidents: Incident[];
-  pendingApprovals: unknown[];
+  pendingApprovals: Approval[];
   newEvents: { seq: number }[];
 }
 
 export function getState(sinceSeq: number): Promise<StatePollResult> {
   return apiGet("/api/state", { since: sinceSeq.toString() });
+}
+
+/**
+ * Console-only (never a tool) — mints the single-use approval token, only
+ * reachable from a trusted human click (plan §12.3). Must be called
+ * immediately before `decideApproval`, never cached or reused.
+ */
+export function issueApprovalNonce(approvalId: string): Promise<{ approvalToken: string }> {
+  return apiGet(`/api/approvals/${encodeURIComponent(approvalId)}/nonce`);
+}
+
+export function decideApproval(
+  approvalId: string,
+  decision: "approved" | "rejected",
+  approvalToken: string,
+  decisionNote?: string
+): Promise<{ ok: boolean; status: ApprovalStatus }> {
+  return apiPost(`/api/approvals/${encodeURIComponent(approvalId)}/decide`, { decision, approvalToken, decisionNote });
 }

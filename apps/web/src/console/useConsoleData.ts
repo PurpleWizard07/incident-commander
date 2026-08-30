@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ServiceId, Incident } from "@incident-commander/shared";
+import type { ServiceId, Incident, Approval } from "@incident-commander/shared";
 import { SERVICE_IDS } from "@incident-commander/shared";
 import {
   getState,
@@ -15,10 +15,16 @@ import {
 import type { Deployment, Change, LogEntry, Trace } from "@incident-commander/shared";
 
 /**
- * Poll cadence from plan §2.2. Only "idle" and "incidentOpen" are reachable in
- * Phase 4 — "activity" (tool call in flight) and "accelerated" (recovery
- * animation) are Phase 5/6 concerns, wired here as a forward-compatible
- * override so the polling loop itself doesn't need to change shape later.
+ * Poll cadence from plan §2.2. "accelerated" now fires automatically while
+ * the incident is `RECOVERING` (Phase 6's executed-remediation window) — the
+ * real recovery is happening server-side over a handful of real seconds
+ * (see store/session.ts), and fast polling is what makes the metrics chart
+ * visibly animate as it happens. "activity" (tool call in flight) is left as
+ * a caller-supplied override rather than wired to tool-call state here,
+ * since that would require this hook to read the ToolActivityContext, which
+ * lives above it in the tree (see AppShell) — a reasonable simplification,
+ * not a correctness gap: RECOVERING is the window that actually needs fast
+ * polling to look right.
  */
 export type PollTier = "idle" | "incidentOpen" | "activity" | "accelerated";
 const POLL_INTERVAL_MS: Record<PollTier, number> = {
@@ -43,6 +49,7 @@ export interface ConsoleData {
   traces: Trace[];
   tracesNote?: string;
   metricSeries: RawMetricSeries[];
+  pendingApprovals: Approval[];
 }
 
 const EMPTY: ConsoleData = {
@@ -58,6 +65,7 @@ const EMPTY: ConsoleData = {
   logs: [],
   traces: [],
   metricSeries: [],
+  pendingApprovals: [],
 };
 
 /**
@@ -74,6 +82,7 @@ export function useConsoleData(pollTierOverride?: PollTier): ConsoleData {
   const seqRef = useRef(0);
   const nowMinuteRef = useRef<number | null>(null);
   const hasIncidentRef = useRef(false);
+  const incidentStateRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,6 +124,7 @@ export function useConsoleData(pollTierOverride?: PollTier): ConsoleData {
         seqRef.current = state.seq;
         const incident = state.incidents[0] ?? null;
         hasIncidentRef.current = incident !== null;
+        incidentStateRef.current = incident?.state ?? null;
 
         setData((prev) => ({
           ...prev,
@@ -123,6 +133,7 @@ export function useConsoleData(pollTierOverride?: PollTier): ConsoleData {
           incident,
           role: state.role,
           scenarioId: state.scenarioId,
+          pendingApprovals: state.pendingApprovals,
         }));
 
         if (incident && nowMinuteRef.current !== state.nowMinute) {
@@ -133,7 +144,9 @@ export function useConsoleData(pollTierOverride?: PollTier): ConsoleData {
         setData((prev) => ({ ...prev, loading: false, error: err instanceof Error ? err.message : String(err) }));
       } finally {
         if (!cancelled) {
-          const tier: PollTier = pollTierOverride ?? (hasIncidentRef.current ? "incidentOpen" : "idle");
+          const tier: PollTier =
+            pollTierOverride ??
+            (incidentStateRef.current === "RECOVERING" ? "accelerated" : hasIncidentRef.current ? "incidentOpen" : "idle");
           timer = setTimeout(tick, POLL_INTERVAL_MS[tier]);
         }
       }

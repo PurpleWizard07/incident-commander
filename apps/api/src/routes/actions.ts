@@ -1,19 +1,22 @@
-import { resolveAction, getScenario } from "../simEngine.js";
+import type { Incident, TimelineEvent } from "../sharedTypes.js";
+import { resolveAction, getScenario, isoForMinute } from "../simEngine.js";
 import type { SessionState } from "../store/session.js";
 import { appendAudit } from "../audit/log.js";
 import { canMutate } from "../authz/roles.js";
 import { consumeApprovalForAction } from "./approvals.js";
 
 /**
- * Phase 2 scope boundary, deliberate: this checks approval validity + action
- * binding + role, resolves the remediation rule (plan §4.6, built in Phase 1),
- * and audits the outcome — the full authorization path. It does NOT yet make
- * `materializeWorld` reflect an executed remediation (e.g. checkout-v3's
- * rollback visibly lowering error_rate on the next poll). That requires
- * extending world derivation with executed-action awareness, which is Phase
- * 6's job per phase.md ("Action tools and the remediation model... Approval
- * flow... execute, binding, consumption") — the recovery curve returned here
- * is what Phase 6's client-side animation (plan §2.2) will consume.
+ * Phase 6: extends Phase 2's authorization path (approval validity, action
+ * binding, role, audit) with the incident-state machine (plan §7) and the
+ * executed-remediation record `store/session.ts` uses to make subsequent
+ * polls/tool calls actually observe recovery — see that file's and
+ * phase-summary.md's Phase 6 entries for how the clock/metric blend works.
+ *
+ * `recoveryMetric` is hardcoded to `error_rate`: the hero scenario's own
+ * remediation messages and approval-card copy ("checkout error rate returns
+ * to baseline... payments recovers in tandem") only ever describe error
+ * rate recovering, and `RemediationRule` doesn't name a metric — a
+ * deliberate Phase 6 simplification, not an oversight.
  */
 function runGatedAction(
   session: SessionState,
@@ -37,8 +40,40 @@ function runGatedAction(
 
   const scenario = getScenario(session.scenarioId);
   const rule = resolveAction(scenario, tool, actionArgs);
+  const approval = consumption.session.approvals.find((a) => a.id === approvalId);
+  const incident = approval ? consumption.session.incidents.find((i) => i.id === approval.incidentId) : undefined;
 
   let next = consumption.session;
+
+  if (incident) {
+    const nowMinute = next.nowMinute;
+    if (rule.effect === "rejected") {
+      // The approval was consumed but nothing executed — nothing to recover
+      // from. Send the incident back to investigation rather than leaving it
+      // stranded in WAITING_FOR_APPROVAL with no pending approval left.
+      const entry: TimelineEvent = { atMinute: nowMinute, at: isoForMinute(nowMinute), source: "system", summary: `${tool} rejected: ${rule.message}` };
+      const updated: Incident = { ...incident, state: "INVESTIGATING", timeline: [...incident.timeline, entry] };
+      next = { ...next, incidents: next.incidents.map((i) => (i.id === updated.id ? updated : i)) };
+    } else {
+      const entry: TimelineEvent = { atMinute: nowMinute, at: isoForMinute(nowMinute), source: "agent", summary: `Executed ${tool}: ${rule.message}` };
+      const updated: Incident = { ...incident, state: "RECOVERING", timeline: [...incident.timeline, entry] };
+      next = {
+        ...next,
+        incidents: next.incidents.map((i) => (i.id === updated.id ? updated : i)),
+        executedRemediation: {
+          incidentId: incident.id,
+          tool,
+          effect: rule.effect,
+          recoveryServices: incident.affectedServices,
+          recoveryMetric: "error_rate",
+          recoveryCurve: rule.recoveryCurve ?? null,
+          executedAtMinute: nowMinute,
+          executedAtRealMs: Date.now(),
+        },
+      };
+    }
+  }
+
   next = appendAudit(next, {
     tool,
     args: actionArgs,

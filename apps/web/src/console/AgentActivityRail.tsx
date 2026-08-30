@@ -1,6 +1,8 @@
+import type { Approval } from "@incident-commander/shared";
 import { Panel } from "./Skeleton.js";
 import { useToolRecords } from "./toolActivity.js";
 import { toolResultText } from "./toolResultText.js";
+import { ApprovalCard } from "./ApprovalCard.js";
 import type { ToolCallRecord } from "../webmcp/registerTools.js";
 
 function icon(record: ToolCallRecord): string {
@@ -32,7 +34,7 @@ function CallEntry({ record }: { record: ToolCallRecord }) {
   );
 }
 
-export function AgentActivityRail() {
+export function AgentActivityRail({ pendingApprovals }: { pendingApprovals: Approval[] }) {
   const records = useToolRecords();
 
   return (
@@ -61,15 +63,25 @@ export function AgentActivityRail() {
             <strong className="text-ic-text">8</strong> action
           </span>
           <span>
-            <strong className="text-ic-text">4</strong> approval
+            <strong className="text-ic-text">3</strong> approval
           </span>
         </div>
       </Panel>
 
       <Panel title="APPROVALS" className="min-h-32 flex-1">
-        <div className="flex h-full items-center justify-center p-3 text-center text-[11px] text-ic-text-dim">
-          No pending approvals. Approval cards arrive in Phase 6.
-        </div>
+        {pendingApprovals.length === 0 ? (
+          <div className="flex h-full items-center justify-center p-3 text-center text-[11px] text-ic-text-dim">
+            No pending approvals.
+          </div>
+        ) : (
+          <div className="h-full overflow-y-auto">
+            {pendingApprovals.map((a) => (
+              <div key={a.id} className="border-b border-ic-border">
+                <ApprovalCard approval={a} />
+              </div>
+            ))}
+          </div>
+        )}
       </Panel>
     </div>
   );

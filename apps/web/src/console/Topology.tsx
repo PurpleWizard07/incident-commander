@@ -16,7 +16,14 @@ const POS: Record<ServiceId, { x: number; y: number }> = {
 
 const NODE_R = 30;
 
-export function Topology({ health }: { health: Partial<Record<ServiceId, ServiceHealthSummary>> }) {
+export function Topology({
+  health,
+  transitioningServices = [],
+}: {
+  health: Partial<Record<ServiceId, ServiceHealthSummary>>;
+  /** Plan §9: "Any action tool → ... affected topology node enters a transition state." Populated with the incident's affected services while it's RECOVERING. */
+  transitioningServices?: ServiceId[];
+}) {
   const edges = SERVICE_IDS.flatMap((id) => SERVICES[id].dependsOn.map((dep) => ({ from: id, to: dep })));
 
   const healthGlow = useGlowingCall(["get_service_health"]);
@@ -50,10 +57,14 @@ export function Topology({ health }: { health: Partial<Record<ServiceId, Service
         const p = POS[id];
         const h = health[id];
         const pulsing = id === healthService;
+        const transitioning = transitioningServices.includes(id);
         return (
           <g key={id}>
             {pulsing && (
               <circle cx={p.x} cy={p.y} r={NODE_R + 6} fill="none" stroke="var(--color-ic-accent)" strokeWidth={2} className={healthGlow?.pending ? "animate-ping" : ""} opacity={healthGlow?.pending ? 0.6 : 0.9} />
+            )}
+            {transitioning && (
+              <circle cx={p.x} cy={p.y} r={NODE_R + 6} fill="none" stroke="var(--color-ic-degraded)" strokeWidth={2} strokeDasharray="4 3" className="animate-spin" style={{ transformOrigin: `${p.x}px ${p.y}px` }} />
             )}
             <circle cx={p.x} cy={p.y} r={NODE_R} fill="var(--color-ic-panel-2)" stroke={pulsing ? "var(--color-ic-accent)" : statusColor(h?.status)} strokeWidth={pulsing ? 4 : 3} />
             <circle cx={p.x} cy={p.y} r={4} fill={statusColor(h?.status)} />

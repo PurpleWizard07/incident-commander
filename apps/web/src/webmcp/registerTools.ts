@@ -1,8 +1,10 @@
-import { getActiveIncidents, getIncident, getIncidentTimeline } from "./tools/incidents.js";
+import { getActiveIncidents, getIncident, getIncidentTimeline, createIncident, assignIncident, addIncidentNote } from "./tools/incidents.js";
 import { getServiceHealth, getServiceDependencies } from "./tools/services.js";
 import { getRecentDeployments, getRecentChanges } from "./tools/deploymentsAndChanges.js";
 import { queryLogs, searchTraces, compareMetrics } from "./tools/observability.js";
 import { inspectAlert, getRunbook } from "./tools/alertsAndRunbooks.js";
+import { rollbackDeployment, restartService, scaleService, disableFeatureFlag, resolveIncident } from "./tools/actions.js";
+import { getPendingApprovals, requestApproval, recordApproval } from "./tools/approvals.js";
 
 /**
  * One record per tool call, updated in place from `start` (settledAt: null)
@@ -57,8 +59,26 @@ const INVESTIGATION_TOOLS = [
   getRunbook,
 ];
 
+/** Plan §6.4 action tools (8) — `create_incident`/`assign_incident`/`add_incident_note` are non-gated; the other five are gated or state-gated, enforced server-side. */
+const ACTION_TOOLS = [
+  createIncident,
+  assignIncident,
+  addIncidentNote,
+  rollbackDeployment,
+  restartService,
+  scaleService,
+  disableFeatureFlag,
+  resolveIncident,
+];
+
+/** Plan §6.5 human-control tools (3). `record_approval`'s denial is deliberate — see that tool's own doc comment. */
+const APPROVAL_TOOLS = [getPendingApprovals, requestApproval, recordApproval];
+
+/** All 23 imperative tools (plan §0/§6) — the 2 declarative forms are Phase 7. */
+const ALL_TOOLS = [...INVESTIGATION_TOOLS, ...ACTION_TOOLS, ...APPROVAL_TOOLS];
+
 /** Wraps a tool's `execute` with the start/settle instrumentation above — shared by the real WebMCP registration and `testInvokeTool` below, so a manual test call exercises the identical code path a live agent's call would. */
-function instrument(tool: (typeof INVESTIGATION_TOOLS)[number]) {
+function instrument(tool: (typeof ALL_TOOLS)[number]) {
   return async (input: Record<string, unknown>) => {
     const id = crypto.randomUUID();
     const startedAt = Date.now();
@@ -77,11 +97,15 @@ function instrument(tool: (typeof INVESTIGATION_TOOLS)[number]) {
 }
 
 /**
- * Phase 3: the 12 read-only investigation tools from plan §6.3, registered
- * imperatively via document.modelContext.registerTool(). Action and approval
- * tools are Phase 6/7 — this is deliberately investigation-only so far.
+ * Registers all 23 imperative tools (plan §6.3-§6.5) via
+ * document.modelContext.registerTool(). Registration is still static/
+ * unconditional here — Phase 3 registered investigation tools this same
+ * way, and dynamic registration (role/state-scoped, plan §8) is Phase 7's
+ * job, not this one's. Authorization for the gated/state-gated tools is
+ * enforced server-side regardless of what's registered client-side (plan
+ * §12.1: "WebMCP is the agent interface, not the security boundary").
  */
-export function registerInvestigationTools(): () => void {
+export function registerImperativeTools(): () => void {
   if (typeof document === "undefined" || !document.modelContext) {
     console.warn(
       "[webmcp] document.modelContext is not available in this browser. " +
@@ -92,7 +116,7 @@ export function registerInvestigationTools(): () => void {
 
   const controller = new AbortController();
 
-  for (const tool of INVESTIGATION_TOOLS) {
+  for (const tool of ALL_TOOLS) {
     document.modelContext.registerTool({ ...tool, execute: instrument(tool) }, { signal: controller.signal });
   }
 
@@ -102,15 +126,15 @@ export function registerInvestigationTools(): () => void {
 /**
  * Manual test hook, same spirit as Phase 0/3's manual test buttons: calls a
  * tool by name through the exact same instrumented path a live agent's call
- * takes (start/settle events, reason capture), for verifying the Phase 5
- * reactivity contract without needing an LLM in the loop. Harmless to leave
- * registered — it can only call the same 12 read-only, server-authorized
- * tools any agent already can, and does nothing unless invoked from the
- * browser console.
+ * takes (start/settle events, reason capture), for verifying the reactivity
+ * contract without needing an LLM in the loop. Harmless to leave registered
+ * — it can only call the same 23 tools any agent already can, all subject
+ * to the same server-side authorization, and does nothing unless invoked
+ * from the browser console.
  */
 export function testInvokeTool(name: string, input: Record<string, unknown> = {}): Promise<unknown> {
-  const tool = INVESTIGATION_TOOLS.find((t) => t.name === name);
-  if (!tool) return Promise.reject(new Error(`No investigation tool named "${name}".`));
+  const tool = ALL_TOOLS.find((t) => t.name === name);
+  if (!tool) return Promise.reject(new Error(`No tool named "${name}".`));
   return instrument(tool)(input);
 }
 
