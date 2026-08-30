@@ -99,7 +99,7 @@ deploys once Netlify is authenticated — Claude can do unattended.
 |---|---|---|---|---|
 | 0 | Proof (go/no-go) | ✅ done | `2e13f94`..`5f82e12` | ChatGPT in-app browser + Chrome (flag, via Inspector extension) verified by user; origin trial token registered, decoded, wired in, and live on production |
 | 1 | Simulation core | ✅ done | `86e5619` | 30/30 tests pass. Found and fixed a real determinism bug — see decisions log |
-| 2 | Backend and store | ✅ done | `(pending commit)` | Full API deployed, curl-verified end to end incl. the full self-approval attack. Two real bugs found+fixed (pnpm/Netlify bundling, trace propagation) — see decisions log |
+| 2 | Backend and store | ✅ done | `ea6e44a` | Full API deployed, curl-verified end to end incl. the full self-approval attack. Two real bugs found+fixed (pnpm/Netlify bundling, trace propagation) — see decisions log |
 | 3 | Investigation tool surface | ⬜ not started | — | |
 | 4 | Console shell | ⬜ not started | — | |
 | 5 | Shared context | ⬜ not started | — | |
