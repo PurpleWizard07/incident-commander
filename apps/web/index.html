@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Incident Commander</title>
     <!--
-      WebMCP origin trial token goes here once the production origin is known.
-      Without it, WebMCP still works in Chrome via chrome://flags/#enable-webmcp-testing,
-      and in ChatGPT's in-app browser without any flag or token at all.
-      See implementation-plan.md §21.1 and phase.md Phase 0.
-      <meta http-equiv="origin-trial" content="PASTE_TOKEN_HERE">
+      WebMCP origin trial token, scoped to https://incident-commander-461.netlify.app, expires
+      2026-11-17. Registered at https://developers.chrome.com/origintrials — see phase-summary.md
+      decisions log (2026-08-31) and implementation-plan.md §21.1. Chrome still also works via
+      chrome://flags/#enable-webmcp-testing without this; ChatGPT's in-app browser needs neither.
     -->
+    <meta http-equiv="origin-trial" content="Ah6WDT2gVBUqaL55gl4OFyC676JcxARyN8nl0otDAYTdBvM80cMrY7IR5OEE56kEJf+gsx6Hq/2Hq1zmoeJUtgIAAABieyJvcmlnaW4iOiJodHRwczovL2luY2lkZW50LWNvbW1hbmRlci00NjEubmV0bGlmeS5hcHA6NDQzIiwiZmVhdHVyZSI6IldlYk1DUCIsImV4cGlyeSI6MTc5NDg3MzYwMH0=">
+
   </head>
   <body>
     <div id="root"></div>
