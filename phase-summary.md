@@ -58,7 +58,7 @@ deploys once Netlify is authenticated — Claude can do unattended.
 | # | Phase | Status | Commit | Notes |
 |---|---|---|---|---|
 | 0 | Proof (go/no-go) | ✅ done | `2e13f94`..`5f82e12` | ChatGPT in-app browser + Chrome (flag, via Inspector extension) verified by user; origin trial token registered, decoded, wired in, and live on production |
-| 1 | Simulation core | ✅ done | `(pending commit)` | 30/30 tests pass. Found and fixed a real determinism bug — see decisions log |
+| 1 | Simulation core | ✅ done | `86e5619` | 30/30 tests pass. Found and fixed a real determinism bug — see decisions log |
 | 2 | Backend and store | ⬜ not started | — | |
 | 3 | Investigation tool surface | ⬜ not started | — | |
 | 4 | Console shell | ⬜ not started | — | |
