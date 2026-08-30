@@ -1,6 +1,7 @@
-import type { Deployment, Change, Alert } from "@incident-commander/shared";
+import type { Deployment, Change, Alert } from "../sharedTypes.js";
 import type { Scenario } from "../types.js";
 import { FOREVER } from "../types.js";
+import { isoForMinute } from "../clock.js";
 
 // Timeline (plan §5.1), minutes relative to T0 = incident open - 90:
 export const DEPLOY_MINUTE = 82; // 10:41 checkout-v3 deployed
@@ -19,7 +20,7 @@ const deployments: Deployment[] = [
     service: "checkout",
     version: "v3",
     deployedAtMinute: DEPLOY_MINUTE,
-    deployedAt: "",
+    deployedAt: isoForMinute(DEPLOY_MINUTE),
     deployedBy: "r.mehta",
     commitSha: "4a91c2f",
     commitMessage: "refactor payment token validation",
@@ -33,7 +34,7 @@ const deployments: Deployment[] = [
     service: "checkout",
     version: "v2",
     deployedAtMinute: CHECKOUT_V2_MINUTE,
-    deployedAt: "",
+    deployedAt: isoForMinute(CHECKOUT_V2_MINUTE),
     deployedBy: "a.silva",
     commitSha: "e10ab3f",
     commitMessage: "add retry on payment gateway timeout",
@@ -47,7 +48,7 @@ const deployments: Deployment[] = [
     service: "payments",
     version: "v4",
     deployedAtMinute: PAYMENTS_V4_MINUTE,
-    deployedAt: "",
+    deployedAt: isoForMinute(PAYMENTS_V4_MINUTE),
     deployedBy: "s.iyer",
     commitSha: "9c2fa41",
     commitMessage: "add fraud-check pre-validation",
@@ -69,7 +70,7 @@ const alerts: Alert[] = [
     threshold: 0.5,
     comparator: ">",
     firedAtMinute: ALERT_MINUTE,
-    firedAt: "",
+    firedAt: isoForMinute(ALERT_MINUTE),
     resolvedAt: null,
     severity: "SEV-1",
     incidentId: "INC-4821",
@@ -82,6 +83,9 @@ export const HERO_CHECKOUT_SCENARIO: Scenario = {
   title: "Checkout degradation",
   severity: "SEV-1",
   isHero: true,
+  defaultNowMinute: NOW_MINUTE,
+  openedAtMinute: INCIDENT_OPEN_MINUTE,
+  affectedServices: ["frontend", "checkout", "payments"],
 
   groundTruth: {
     rootCause: "checkout-v3 introduced a payment-token validation regression",
@@ -180,7 +184,7 @@ export const HERO_CHECKOUT_SCENARIO: Scenario = {
               return { status: "ok", attributes: { deployment: "checkout-v2" } };
             }
             // Rolling deploy overlap: a lingering fraction of traffic still hits v2 pods.
-            if (ctx.rng.bool(0.12)) {
+            if (ctx.rng.bool(0.18)) {
               return { status: "ok", attributes: { deployment: "checkout-v2" } };
             }
             if (ctx.minute < ONSET_MINUTE) {

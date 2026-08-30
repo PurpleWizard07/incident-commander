@@ -1,5 +1,5 @@
-import type { ServiceId, MetricName, MetricSeries } from "@incident-commander/shared";
-import { SERVICE_IDS } from "@incident-commander/shared";
+import type { ServiceId, MetricName, MetricSeries } from "./sharedTypes.js";
+import { SERVICE_IDS } from "./sharedTypes.js";
 import { Rng, deriveSeed } from "./prng.js";
 import type { Scenario, World } from "./types.js";
 import { buildMetricSeries } from "./generators/metrics.js";

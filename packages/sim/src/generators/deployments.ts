@@ -1,4 +1,4 @@
-import type { Deployment, ServiceId } from "@incident-commander/shared";
+import type { Deployment, ServiceId } from "../sharedTypes.js";
 
 /** The most recent deployment for a service that had already happened by `minute`. */
 export function activeDeploymentAt(

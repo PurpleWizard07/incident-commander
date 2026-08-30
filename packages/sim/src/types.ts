@@ -7,7 +7,7 @@ import type {
   Deployment,
   Change,
   Alert,
-} from "@incident-commander/shared";
+} from "./sharedTypes.js";
 import type { Rng } from "./prng.js";
 
 /** A phase/metric window never ends: use this as `toMinute` for "holds forever". */
@@ -134,6 +134,18 @@ export interface Scenario {
   runbookIds: string[];
   remediation: RemediationRule[];
   spontaneousRecoveryAt?: number;
+
+  // Added in Phase 2, not in the plan's original §4.3 listing — needed once a
+  // session has to bootstrap an Incident record generically for WHICHEVER
+  // scenario is loaded, not just the hero one. These are the scenario's
+  // canonical narrative starting point, not live clock state: a session's
+  // CURRENT minute and an incident's CURRENT state still live on the session
+  // and advance from here as the incident is investigated (Phase 1's original
+  // "now belongs to the session, not the scenario" reasoning was about that
+  // live advancement, not about what a fresh bootstrap should show).
+  defaultNowMinute: number;
+  openedAtMinute: number;
+  affectedServices: ServiceId[];
 }
 
 // --- Materialized world (the engine's output at a point in time) -----------

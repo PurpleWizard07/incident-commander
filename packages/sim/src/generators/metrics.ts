@@ -1,4 +1,4 @@
-import type { MetricName, MetricPoint, MetricSeries, ServiceId } from "@incident-commander/shared";
+import type { MetricName, MetricPoint, MetricSeries, ServiceId } from "../sharedTypes.js";
 import { isoForMinute } from "../clock.js";
 import type { Phase } from "../types.js";
 import type { Rng } from "../prng.js";

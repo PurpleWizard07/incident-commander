@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { materializeWorld } from "../src/world.js";
-import { HERO_CHECKOUT_SCENARIO, NOW_MINUTE, PAYMENTS_SPIKE_MINUTE } from "../src/scenarios/hero-checkout.js";
+import { HERO_CHECKOUT_SCENARIO, NOW_MINUTE, PAYMENTS_SPIKE_MINUTE, ONSET_MINUTE } from "../src/scenarios/hero-checkout.js";
 
 const world = materializeWorld(HERO_CHECKOUT_SCENARIO, 42, NOW_MINUTE);
 
@@ -47,8 +47,30 @@ describe("evidence integrity — INC-4821 (plan §14.1, §5.1)", () => {
     }
   });
 
+  it("stops the call chain at the failing span — no descendant of it appears at any depth", () => {
+    // Regression test: an earlier version only checked a span's DIRECT parent
+    // against the failed-name set, so a grandchild whose parent was itself
+    // SKIPPED (rather than evaluated-and-failed) incorrectly resumed
+    // execution one level below the real failure — e.g. checkout.callPayments
+    // correctly vanished, but payments.processPayment (its child) still
+    // appeared with parentSpanId: null, as if it had been called directly.
+    const failing = world.traces.filter((t) => t.status === "error");
+    expect(failing.length).toBeGreaterThan(0);
+    const descendantNames = ["checkout.callPayments", "payments.processPayment", "payments.callDatabase", "database.query"];
+    for (const trace of failing) {
+      const names = trace.spans.map((s) => s.name);
+      for (const forbidden of descendantNames) {
+        expect(names).not.toContain(forbidden);
+      }
+    }
+  });
+
   it("still serves some post-onset traces successfully from lingering checkout-v2 instances", () => {
-    const postOnset = world.traces.filter((t) => t.minute >= 86 && t.minute <= NOW_MINUTE);
+    // The whole post-onset window, not a narrow slice of it: at ~2.2 traces/min
+    // and an 18% lingering-v2 draw, a narrower window occasionally lands zero
+    // by chance for a given seed even though the mechanism is working
+    // correctly — this width gives a comfortable statistical margin instead.
+    const postOnset = world.traces.filter((t) => t.minute >= ONSET_MINUTE && t.minute <= NOW_MINUTE);
     const succeededOnV2 = postOnset.filter((t) => {
       const span = t.spans.find((s) => s.name === "checkout.validatePaymentToken");
       return span?.status === "ok" && span.attributes.deployment === "checkout-v2";

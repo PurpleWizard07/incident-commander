@@ -43,6 +43,17 @@ These are settled decisions. Do not relitigate or "improve" them without being a
   `Rng`, keyed by a stable `id`.** Never thread one shared `Rng` across them sequentially — see
   phase-summary.md's 2026-08-31 Phase 1 entries for the real bug this caused (a past data point's
   value silently depended on how far into the future the world was asked to generate).
+- **`node-linker: hoisted` in `pnpm-workspace.yaml` is required — do not remove it or reinstall in a
+  way that drops it.** Without it, deployed functions fail at runtime with `Cannot find package`.
+  Import our own workspace packages (`sim`, `shared`) via the relative-path shim files
+  (`simEngine.ts`/`sharedTypes.ts`), never the bare `@incident-commander/*` specifier, inside
+  `apps/api`. **Deploy with the exact command in phase-summary.md's "Deploying this project"
+  section** — the flags are all load-bearing and a plausible-looking variant fails silently
+  (zero functions deployed, no error) or confusingly (dependency not found at runtime).
+- **`netlify dev` does not work on this Windows machine — don't spend time debugging it further.**
+  Verify backend changes by deploying and curl-testing production. See phase-summary.md's Phase 2
+  Known Issues for why (an `EPERM` symlink permission wall in Netlify's local bundler, unrelated to
+  our code and absent on the actual deployed Linux environment).
 
 ## Working agreement
 

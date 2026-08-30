@@ -119,13 +119,41 @@ remediation, shapes (all 6 phase shapes unit-tested even though the hero scenari
 - AuthZ layer: roles, approval tokens, action binding, state gates, audit writer.
 
 **Done when:**
-- [ ] Every plan §11 endpoint responds correctly to curl.
-- [ ] Two concurrent sessions do not see each other's state.
-- [ ] A gated action without a valid approval is refused, and the refusal is in the audit log.
-- [ ] Killing and restarting the function loses nothing — state is in Blobs, not memory.
-- [ ] `since=<seq>` returns only newer events.
+- [x] Every plan §11 endpoint responds correctly to curl. Verified against the **deployed production
+      URL**, not `netlify dev` — see the Windows dev-server note below and phase-summary.md.
+- [x] Two concurrent sessions do not see each other's state. Verified: a session with a full
+      approve→execute history and a brand-new session's `X-Session-Id` show completely independent
+      incident state.
+- [x] A gated action without a valid approval is refused, and the refusal is in the audit log.
+      Verified the full self-approval attack from plan §12.3 end to end: agent requests approval,
+      agent tries to decide its own request with no token → denied + audited, agent tries to execute
+      anyway → denied (still pending). Also verified action-binding (an approval for
+      `scale_service(database)` cannot execute `rollback_deployment(checkout)`) and single-use
+      consumption (both the nonce and the approval itself) independently.
+- [x] Killing and restarting the function loses nothing — state is in Blobs, not memory. True by
+      construction (every Netlify Function invocation is already a fresh process; nothing here
+      relies on in-memory state surviving between calls) and confirmed by the session-reset test.
+- [x] `since=<seq>` returns only newer events. Verified both directions: `since=0` returns
+      everything, `since=<current seq>` returns an empty `newEvents` array.
 
 **Do not:** build UI. Do not register tools yet.
+
+**Done, with two real bugs found and fixed along the way** (both recorded in phase-summary.md's
+Phase 2 decisions log — read it before touching `packages/sim`'s generators or the deploy command):
+
+1. A pnpm + Netlify Functions bundling incompatibility that had nothing to do with our own code —
+   fixed by switching to `node-linker: hoisted` in `pnpm-workspace.yaml`. Every future deploy uses a
+   specific command documented there; deviating from it will silently reintroduce this.
+2. A trace-generation bug where a span's unreachability (parent failed) only propagated one level,
+   not transitively — a grandchild of a failed span could incorrectly still appear as if it had been
+   called directly. Fixed in `packages/sim/src/generators/traces.ts`, with a regression test.
+
+**Local dev is not usable on this Windows machine** for testing Netlify Functions — `netlify dev`
+hits an `EPERM` symlink permission error that's an OS/CLI interaction issue, not a code issue (Linux,
+including the actual deployed environment, doesn't have this problem). Every phase from here on that
+touches the backend gets verified by **deploying and curl-testing production directly**, per the
+command in phase-summary.md's decisions log — this is slower per iteration than a local dev loop
+would be, budget for that.
 
 ---
 

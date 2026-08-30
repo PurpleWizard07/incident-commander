@@ -9,15 +9,55 @@ the plan describes intent, this describes what actually happened.
 
 ## NEXT ACTION
 
-> **Phase 1 — done. Start Phase 2 (backend and store).** `packages/sim` builds the hero incident
-> deterministically; 30 tests pass. Phase 2 wires this engine behind real Netlify Functions on
-> Netlify Blobs (event-sourced, per plan §2.1/§2.2 — no SQLite, no SSE). Read plan §2.1, §2.2,
-> §3.10, §3.11, §11, §12 before starting. No human input needed for this phase — it's all backend
-> code, verifiable with curl.
+> **Phase 2 — done. Start Phase 3 (investigation tool surface).** Full backend API deployed and
+> curl-verified against production: all ~24 endpoints, session isolation, the complete self-approval
+> attack from plan §12.3, action-binding, single-use tokens/approvals, state polling. Phase 3 wires
+> the 12 read-only investigation tools to this API via `document.modelContext.registerTool()`. Read
+> plan §6.1–§6.3, §6.6, §6.7, §14.2 before starting. **Read "Deploying this project" below before
+> your first deploy** — the command is not the obvious one, and getting it wrong fails silently or
+> confusingly.
+>
+> No human input needed for Phase 3's own work (still backend-adjacent — tool registration + a
+> fetch to already-verified endpoints), but plan §14.5 means the browser verification pattern from
+> Phase 0 recurs once Phase 3's tools are live: ChatGPT in-app browser (P0) and Chrome + flag (P1).
 
 **Live URL:** https://incident-commander-461.netlify.app
 **Repo:** https://github.com/PurpleWizard07/incident-commander
 **Netlify admin:** https://app.netlify.com/projects/incident-commander-461
+
+---
+
+## Deploying this project — read before your first deploy of a session
+
+**The working command** (run from repo root, after `pnpm --filter web build`):
+
+```
+netlify deploy --filter @incident-commander/web --no-build --dir apps/web/dist --functions "C:/Users/varad/OneDrive/Desktop/webmcp/apps/api/src/functions" --prod
+```
+
+Every piece of this is load-bearing, for reasons discovered the hard way (Phase 0 and Phase 2):
+
+- **`--filter @incident-commander/web`** — required on *every* `netlify` CLI command in this repo,
+  or an interactive "which project?" prompt fires and **crashes** (`ERR_USE_AFTER_CLOSE`) since this
+  environment has no TTY. The specific value (`web` vs `api`) turned out NOT to matter for `deploy`
+  (tested both; identical result) — it only matters for `netlify dev` (see below), where it does.
+- **`--dir` and `--functions` must be exactly these paths, and `--functions` must be absolute.** A
+  relative `--functions` path silently gets joined onto the filtered app's directory instead of the
+  repo root, resolves to a nonexistent folder, and **the CLI deploys successfully with zero
+  functions and no error.** This is the single easiest way to ship a build that looks fine and has a
+  dead API.
+- **`node-linker: hoisted` in `pnpm-workspace.yaml` is required, permanently.** Without it, the
+  deployed function fails at runtime with `Cannot find package '@netlify/blobs'` (or any other
+  dependency declared only in `apps/api/package.json`) — Netlify's function bundler cannot correctly
+  trace transitive dependencies through pnpm's default symlinked/nested `node_modules` layout in
+  this monorepo. Do not revert this setting or "clean up" `node_modules` in a way that reinstalls
+  without it — see the decisions log below for the full story before touching pnpm config here.
+- **Always redeploy after `pnpm --filter web build`** if `apps/web/index.html` or any frontend
+  source changed — `--no-build` means the CLI trusts your local `dist/` as-is.
+
+**Local `netlify dev` does not work on this Windows machine** and is not worth debugging further —
+see Known Issues below. Verify backend changes by deploying and curl-testing production directly.
+This is slower per iteration than a working local dev loop; budget for it in later phases.
 
 ---
 
@@ -59,7 +99,7 @@ deploys once Netlify is authenticated — Claude can do unattended.
 |---|---|---|---|---|
 | 0 | Proof (go/no-go) | ✅ done | `2e13f94`..`5f82e12` | ChatGPT in-app browser + Chrome (flag, via Inspector extension) verified by user; origin trial token registered, decoded, wired in, and live on production |
 | 1 | Simulation core | ✅ done | `86e5619` | 30/30 tests pass. Found and fixed a real determinism bug — see decisions log |
-| 2 | Backend and store | ⬜ not started | — | |
+| 2 | Backend and store | ✅ done | `(pending commit)` | Full API deployed, curl-verified end to end incl. the full self-approval attack. Two real bugs found+fixed (pnpm/Netlify bundling, trace propagation) — see decisions log |
 | 3 | Investigation tool surface | ⬜ not started | — | |
 | 4 | Console shell | ⬜ not started | — | |
 | 5 | Shared context | ⬜ not started | — | |
@@ -93,6 +133,13 @@ One line each: what was decided, and why.
 | 2026-08-30 | 0 | Manual deploys from this repo **require** `--filter @incident-commander/web` on every `netlify` CLI command, and `--functions` must be an **absolute path** | See Known Issues below — this is a real gotcha that will bite again on every future deploy unless a future session reads this |
 | 2026-08-31 | 0 | **Stop targeting "Chrome 156" as a specific version anywhere.** Corrected in CLAUDE.md and phase.md. | User's screenshot of the origin trial registration form showed stable Chrome was at v152 on this date, with the trial covering v149–156 and running through **2026-11-17** — a fixed end date well past our deadline. "156" was always just the top of that range, never a version to chase; the hackathon's own rules only ever said "Chrome with the flag enabled," no version. A future session must not waste time hunting for Chrome 156 |
 | 2026-08-31 | 0 | **The Model Context Protocol Inspector extension is the primary way to test Chrome-side, not a fallback.** Documented in CLAUDE.md, phase.md, and "What needs you" above. | Chrome ships no built-in chat agent yet (Gemini-in-Chrome WebMCP support is announced, not shipped, as of this date). Its "Execute Tool" mode manually calls a registered tool — proving registration/execution without needing any LLM in the loop at all |
+| 2026-08-31 | 2 | **`node-linker: hoisted` added to `pnpm-workspace.yaml`, and a full `rm -rf` + reinstall of every `node_modules` was required for it to take effect.** Load-bearing — see "Deploying this project" above. | Netlify's function bundler (esbuild + zip-it-and-ship-it) could not correctly trace `@netlify/blobs` (declared only in `apps/api/package.json`) through pnpm's default symlinked/nested `.pnpm/` store structure — confirmed this is a documented, known category of pnpm-monorepo + serverless-bundler incompatibility, not something specific to our code. Switching pnpm to lay out a classic flat/hoisted `node_modules` (sacrificing some of pnpm's strict per-package isolation, an acceptable tradeoff for a project this size) made the dependency a real, findable directory at the repo root instead of a symlink into the content-addressable store, which the bundler traces correctly |
+| 2026-08-31 | 2 | Our OWN workspace packages (`@incident-commander/sim`, `@incident-commander/shared`) are imported into `apps/api` via **relative-path shim files** (`apps/api/src/simEngine.ts`, `apps/api/src/sharedTypes.ts`, and `packages/sim/src/sharedTypes.ts`), never via the bare package specifier. | A *separate* problem from the hoisting issue above, hit first: Netlify's bundler leaves bare-specifier imports as external/runtime-resolved, and even once resolvable, Node's native loader doesn't understand this project's `./foo.js`→`./foo.ts` TS convention on a file it never bundled. A relative import gets inlined at bundle time instead, sidestepping both. Fixed *before* the hoisting fix; both were needed — this one for our own source, hoisting for third-party npm packages like `@netlify/blobs` which can't be "relatively imported" at all |
+| 2026-08-31 | 2 | **`readModifyWrite`'s optimistic-concurrency check is a best-effort staleness check (re-read the etag immediately before writing, retry on mismatch), not a true atomic compare-and-swap.** Documented in code comments in `store/blobs.ts`. | The installed `@netlify/blobs` version has no `onlyIfMatch`/conditional-write option on `set`/`setJSON`. A real gap between check and write remains. Judged an acceptable, explicitly-flagged tradeoff: a session corresponds to one responder's one console tab talking to one agent, so genuinely concurrent writers to the *same* session aren't an expected case. What the design actually guarantees solidly — different sessions never collide — was verified directly |
+| 2026-08-31 | 2 | **Incidents/approvals are cached views updated in the same transaction as the audit event that produced them, not recomputed by replaying `events` on every read.** A deliberate simplification of plan §2.1's literal "current world = pure reduction over the event log." | Full event-sourcing replay is meaningfully more code for no practical benefit at this scale, and the guarantees that actually matter (nothing exists without a corresponding audit entry; a restart loses nothing) hold identically either way, since both are written atomically together |
+| 2026-08-31 | 2 | **The "approval token" from plan §12.3 is implemented as a single-use, Blobs-backed, TTL'd nonce — not a separately HMAC-signed token layered on top of one.** `authz/approvalToken.ts`. | The nonce itself is already unobtainable by any WebMCP tool (issued only via a console-only endpoint never registered as a tool) and is deleted on first use regardless of outcome. A second signing layer on top wouldn't add real security, only complexity — the *unobtainability* is the whole security property, not the token's shape |
+| 2026-08-31 | 2 | **`Scenario` gained three fields not in the plan's original §4.3 listing: `defaultNowMinute`, `openedAtMinute`, `affectedServices`.** `packages/sim/src/types.ts`, set in `hero-checkout.ts`. | Resolves a gap Phase 1 deliberately left open (see that phase's own note about "now belongs to the session, not the scenario"). That reasoning was about *live* clock advancement; a session bootstrapping an `Incident` record for *whichever* scenario is loaded still needs to know that scenario's own canonical narrative starting point. Needed the moment Phase 2 had to bootstrap generically rather than just for the one hardcoded hero scenario |
+| 2026-08-31 | 2 | **Two real bugs found via this phase's own verification, both fixed with regression coverage:** (1) `Deployment.deployedAt`/`Alert.firedAt` were left as literal `""` placeholders in `hero-checkout.ts` and never computed — fixed by calling `isoForMinute()` at scenario-definition time. (2) The trace generator's "skip children of a failed span" check only looked at the *direct* parent's name, not transitively — a span whose parent was itself *skipped* (rather than evaluated-and-failed) incorrectly resumed execution, so `payments.processPayment` could appear as if called directly even though `checkout.validatePaymentToken` (its grandparent) had failed. Fixed in `generators/traces.ts` by propagating the failed/skipped name transitively; regression test added in `evidence-integrity.test.ts`. | Both were caught by testing against the *real deployed API*, not by code review — reinforces that curl-verification against production is doing real work, not just satisfying a checklist. Fixing (2) legitimately changed the rng-consumption footprint of later traces in the same materialization, which is why the "lingering checkout-v2" test's probability was bumped 0.12→0.18 and its check window widened — not a new bug, a statistically-thin existing test exposed by a footprint shift |
 | 2026-08-31 | 1 | **Every metric series, log template, and trace shape gets its OWN independently-seeded `Rng`, derived via `deriveSeed(id, baseSeed)` — never one shared `Rng` threaded sequentially across all of them.** Enforced in `world.ts`, `generators/logs.ts`, `generators/traces.ts`. `LogTemplate` and `TraceShape` both carry a stable `id` field specifically to seed this. | **This was a real engine bug, caught by the phase's own determinism test, not a test-writing mistake.** With one shared rng, generating up to `nowMinute=50` vs `nowMinute=93` consumed a *different number* of draws in every series/template/shape that ran before the one being checked (since each one's minute-range depends on `nowMinute`) — so a later series' values silently depended on how far an earlier, unrelated one had been asked to generate. Concretely: a past log's displayed timestamp changed value depending on what *future* minute the world was asked to materialize. For a live-polling product (plan §2.2) this would mean a chart re-jitters data the user already saw, on every poll — exactly the kind of thing that undermines the "shared context" reactivity thesis. Only the trace generator's single-shape hero scenario masked this from showing up there; Phase 8 will add more shapes and templates, so this had to be fixed at the engine level now, not patched around |
 | 2026-08-31 | 1 | Domain model types (`Service`, `Deployment`, `MetricSeries`, `LogEntry`, `Trace`/`Span`, `Change`, `Alert`) live in `packages/shared`, not `packages/sim`. Generation-only types (`Phase`, `LogTemplate`, `TraceShape`, `Scenario`, `RemediationRule`) live in `packages/sim`. | Matches plan §16's own description of the two packages ("shared by web and api" vs "engine, scenarios, generators") — the API (Phase 2) and eventually the web console need the domain types without pulling in the whole generation engine |
 | 2026-08-31 | 1 | A `Phase`'s `toMinute` uses the literal constant `FOREVER = 100_000` (minutes) for "holds indefinitely," rather than making the field nullable. | Keeps the `Phase` interface identical to plan §4.4's — `toMinute: number`, non-nullable. A scenario doesn't know `nowMinute` in advance (that's a runtime query parameter), so "holds until superseded" needs *some* sentinel; a very large constant was simpler than adding nullability that would ripple into the shape evaluator |
@@ -126,6 +173,8 @@ Things that are broken, ugly, or postponed, so a later session does not rediscov
 | 0 | No git-based CI/CD is wired up. Every deploy so far is a manual local `pnpm --filter web build` + `netlify deploy --prod` run by Claude. Netlify's dashboard could auto-deploy on push instead, which would sidestep the `--filter` gotcha above entirely (server-side builds don't go through the interactive CLI) — but wiring that up needs one dashboard click to authorize Netlify's GitHub App, so it needs the user. Deferred; not blocking, since manual deploys work | Low | Consider before Phase 8+, once deploys become frequent |
 | 0 | ~~WebMCP origin trial token not yet registered~~ **Resolved 2026-08-31** — token registered, decoded and verified, wired into `index.html`, deployed to production. Flag-free Chrome path not yet re-tested by a human in an actual browser (only confirmed via curl that the meta tag is present) — worth a quick check next time Chrome is open, not blocking | Low | plan §21.1 |
 | 0 | **Gemini API 403 "Your project has been denied access" / PERMISSION_DENIED.** Hit when the user tried the Inspector extension's "Interact with page" mode with a fresh AI Studio key. Widely reported on Google's own AI Developer Forum as a project-level restriction Google applies silently; self-service fixes (billing, region, fresh project) don't reliably clear it — their own guidance is "contact support." Not our bug, not blocking (Execute Tool mode already proved the pipeline works without any LLM) | Low — cosmetic, optional test path only | N/A, external to this project |
+| 2 | **`netlify dev` cannot run functions on this Windows machine.** With `--filter @incident-commander/web`, third-party deps declared only in `apps/api/package.json` (e.g. `@netlify/blobs`) aren't found at runtime (fixed for the *deployed* case by hoisting — see decisions log — but local dev serves from a live symlink farm, not a zip, so it hits a second problem). With `--filter @incident-commander/api` instead (which does fix the dependency-resolution part locally), Netlify's local bundler then tries to create a true Windows symlink from the pnpm store into a `functions-serve` staging directory and gets `EPERM: operation not permitted` — Windows requires Developer Mode or admin rights for real symlinks (pnpm's own symlinks work because it uses junctions instead, which don't need elevation; this specific bundler step doesn't). Not attempted: enabling Developer Mode, since that's a system security setting change, not something to flip without asking | Medium — no fast local dev loop for backend changes; every backend change needs a deploy+curl cycle | Deploy to production and curl-test there instead (validated, see decisions log) |
+| 2 | **Approval ids are not incident-scoped or sequential-looking** (`approval-${session.seq+1}` — a global audit-sequence-derived id, so ids jump around, e.g. `approval-1`, then `approval-9` after other audit events occurred in between). Purely cosmetic — ids are still unique and stable, nothing depends on them looking sequential | Low | Not in plan; a Phase 4+ UI nicety if it ever matters for display, not a correctness concern |
 
 ---
 

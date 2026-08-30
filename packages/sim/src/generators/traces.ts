@@ -1,4 +1,4 @@
-import type { Trace, Span } from "@incident-commander/shared";
+import type { Trace, Span } from "../sharedTypes.js";
 import { isoForMinute } from "../clock.js";
 import type { TraceShape, SpanOutcome, TraceRequestContext } from "../types.js";
 import { Rng, deriveSeed } from "../prng.js";
@@ -18,8 +18,16 @@ function generateOneTrace(shape: TraceShape, minute: number, rng: Rng): Trace {
   let failingSpanId: string | null = null;
 
   for (const spec of shape.spans) {
-    // An ancestor already failed: the call never reached this span.
-    if (spec.parent && failedNames.has(spec.parent)) continue;
+    // An ancestor already failed: the call never reached this span. Mark
+    // THIS span's name as failed too (not just spans that were actually
+    // evaluated), so this unreachability propagates transitively to any of
+    // its own children — otherwise a grandchild whose direct parent was
+    // itself skipped (rather than evaluated-and-failed) would incorrectly
+    // resume execution one level below the real failure.
+    if (spec.parent && failedNames.has(spec.parent)) {
+      failedNames.add(spec.name);
+      continue;
+    }
 
     const spanId = rng.hexId(6);
     idByName.set(spec.name, spanId);

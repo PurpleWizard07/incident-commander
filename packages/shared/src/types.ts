@@ -233,3 +233,123 @@ export interface Alert {
   incidentId: string | null;
   currentValue: number;
 }
+
+// --- Session role (plan §7.1, §8.1, §13.2) ----------------------------------
+
+export type Role = "responder" | "approver" | "observer";
+
+// --- Runbook (plan §3.8) -----------------------------------------------------
+
+export interface RunbookStep {
+  n: number;
+  text: string;
+  toolHint: string | null;
+}
+
+export interface Runbook {
+  id: string;
+  title: string;
+  symptoms: string[];
+  services: ServiceId[];
+  steps: RunbookStep[];
+  lastReviewed: string;
+}
+
+// --- Incident (plan §3.9, §7) ------------------------------------------------
+
+// Full lifecycle from plan §7.1. Phase 2 gives incidents a `state` field and a
+// generic setter; the actual transition RULES (what's valid from where, the two
+// reverse transitions) are Phase 6/7's job, not enforced yet.
+export type IncidentState =
+  | "TRIGGERED"
+  | "OPEN"
+  | "INVESTIGATING"
+  | "DIAGNOSIS_FOUND"
+  | "REMEDIATION_PROPOSED"
+  | "WAITING_FOR_APPROVAL"
+  | "MITIGATING"
+  | "RECOVERING"
+  | "MONITORING"
+  | "RESOLVED";
+
+export interface EvidenceRef {
+  kind: "log" | "trace" | "metric_window" | "deployment" | "change";
+  id: string;
+  label: string;
+}
+
+export interface IncidentNote {
+  id: string;
+  atMinute: number;
+  at: string;
+  authorKind: "agent" | "human";
+  author: string;
+  note: string;
+  evidenceRefs: EvidenceRef[];
+}
+
+export interface TimelineEvent {
+  atMinute: number;
+  at: string;
+  source: "system" | "agent" | "human";
+  summary: string;
+}
+
+export interface Incident {
+  id: string;
+  title: string;
+  severity: Severity;
+  state: IncidentState;
+  openedAtMinute: number;
+  openedAt: string;
+  resolvedAt: string | null;
+  affectedServices: ServiceId[];
+  assignee: string | null;
+  notes: IncidentNote[];
+  timeline: TimelineEvent[];
+  // Deliberately absent: scenarioId, groundTruth. See plan §3.9 — an Incident
+  // record is what the agent/console sees, and must never carry the answer key.
+}
+
+// --- Approval (plan §3.10) ---------------------------------------------------
+
+export type ApprovalStatus = "pending" | "approved" | "rejected" | "expired" | "superseded";
+export type Risk = "low" | "medium" | "high";
+
+export interface Approval {
+  id: string;
+  incidentId: string;
+  requestedAtMinute: number;
+  requestedAt: string;
+  requestedBy: "agent" | string;
+  action: { tool: string; args: Record<string, unknown> };
+  reason: string;
+  evidenceRefs: EvidenceRef[];
+  expectedEffect: string;
+  notCovered: string;
+  risk: Risk;
+  status: ApprovalStatus;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  decisionNote: string | null;
+  consumedAt: string | null;
+}
+
+// --- Audit record (plan §3.11) -----------------------------------------------
+
+export type AuditOutcome = "allowed" | "denied" | "error";
+
+export interface AuditRecord {
+  seq: number;
+  at: string;
+  atMinute: number;
+  actor: { kind: "agent" | "human"; identity: string; sessionId: string };
+  tool: string;
+  args: Record<string, unknown>;
+  approvalId: string | null;
+  outcome: AuditOutcome;
+  denialReason: string | null;
+  resultSummary: string;
+  stateBefore: string | null;
+  stateAfter: string | null;
+}

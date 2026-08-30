@@ -1,4 +1,4 @@
-import type { LogEntry, Deployment } from "@incident-commander/shared";
+import type { LogEntry, Deployment } from "../sharedTypes.js";
 import { isoForMinute } from "../clock.js";
 import type { LogTemplate } from "../types.js";
 import { Rng, deriveSeed } from "../prng.js";
