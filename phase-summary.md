@@ -100,7 +100,7 @@ deploys once Netlify is authenticated — Claude can do unattended.
 | 0 | Proof (go/no-go) | ✅ done | `2e13f94`..`5f82e12` | ChatGPT in-app browser + Chrome (flag, via Inspector extension) verified by user; origin trial token registered, decoded, wired in, and live on production |
 | 1 | Simulation core | ✅ done | `86e5619` | 30/30 tests pass. Found and fixed a real determinism bug — see decisions log |
 | 2 | Backend and store | ✅ done | `ea6e44a` | Full API deployed, curl-verified end to end incl. the full self-approval attack. Two real bugs found+fixed (pnpm/Netlify bundling, trace propagation) — see decisions log |
-| 3 | Investigation tool surface | 🟡 code done, deployed | `(pending commit)` | All 12 tools registered and live. Blocked only on the human ChatGPT-in-app-browser check — see NEXT ACTION |
+| 3 | Investigation tool surface | 🟡 code done, deployed | `9fde265` | All 12 tools registered and live. Blocked only on the human ChatGPT-in-app-browser check — see NEXT ACTION |
 | 4 | Console shell | ⬜ not started | — | |
 | 5 | Shared context | ⬜ not started | — | |
 | 6 | Authority | ⬜ not started | — | |
@@ -191,7 +191,7 @@ The riskiest unknown in the project. Re-verify after any change to tool registra
 |---|---|---|---|---|---|
 | 2026-08-31 | `2e13f94` | ✅ pass | ⬜ not registered yet | ✅ pass | ChatGPT: agent reported checkout errorRate 0.64/baseline 0.005, latencyP95 260/baseline 240 — exact match to hardcoded data, confirms real execution not a hallucinated guess. Chrome: verified via Model Context Protocol Inspector's "Execute Tool," stable channel was v152 (flag-enabled) |
 | 2026-08-31 | `5f82e12` | — | ✅ token wired in, deployed, meta tag confirmed live on production | — | Token decoded before embedding: `{origin: https://incident-commander-461.netlify.app:443, feature: WebMCP, expiry: 2026-11-17}` — matches exactly. Not yet re-tested flag-free in an actual browser; do that opportunistically, not blocking |
-| 2026-08-31 | `(pending, Phase 3)` | ⬜ **awaiting you** | — | — | Registration changed from 1 hardcoded tool to 12 real investigation tools. Needs re-verification per plan §14.5 (any registration change). Ask: "Investigate the checkout incident and tell me what you recommend." Correct: checkout-v3, not payments |
+| 2026-08-31 | `9fde265` | ⬜ **awaiting you** | — | — | Registration changed from 1 hardcoded tool to 12 real investigation tools. Needs re-verification per plan §14.5 (any registration change). Ask: "Investigate the checkout incident and tell me what you recommend." Correct: checkout-v3, not payments |
 
 ---
 
