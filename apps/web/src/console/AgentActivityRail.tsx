@@ -3,7 +3,7 @@ import { Panel } from "./Skeleton.js";
 import { useToolRecords } from "./toolActivity.js";
 import { toolResultText } from "./toolResultText.js";
 import { ApprovalCard } from "./ApprovalCard.js";
-import type { ToolCallRecord } from "../webmcp/registerTools.js";
+import { describeToolSurface, type ToolCallRecord, type ToolSurfaceContext } from "../webmcp/registerTools.js";
 
 function icon(record: ToolCallRecord): string {
   if (record.settledAt === null) return "⟳";
@@ -34,8 +34,15 @@ function CallEntry({ record }: { record: ToolCallRecord }) {
   );
 }
 
-export function AgentActivityRail({ pendingApprovals }: { pendingApprovals: Approval[] }) {
+export function AgentActivityRail({
+  pendingApprovals,
+  toolSurfaceContext,
+}: {
+  pendingApprovals: Approval[];
+  toolSurfaceContext: ToolSurfaceContext;
+}) {
   const records = useToolRecords();
+  const surface = describeToolSurface(toolSurfaceContext);
 
   return (
     <div className="flex h-full flex-col gap-3 p-3">
@@ -55,16 +62,22 @@ export function AgentActivityRail({ pendingApprovals }: { pendingApprovals: Appr
       </Panel>
 
       <Panel title="TOOLS" className="h-20 shrink-0">
-        <div className="flex h-full items-center justify-around font-mono text-[11px] text-ic-text-dim">
-          <span>
-            <strong className="text-ic-text">12</strong> read
-          </span>
-          <span>
-            <strong className="text-ic-text">8</strong> action
-          </span>
-          <span>
-            <strong className="text-ic-text">3</strong> approval
-          </span>
+        <div className="flex h-full flex-col items-center justify-center gap-1 font-mono text-[11px] text-ic-text-dim">
+          <div className="flex items-center justify-around w-full">
+            <span>
+              <strong className="text-ic-text">{surface.read}</strong> read
+            </span>
+            <span>
+              <strong className="text-ic-text">{surface.action}</strong> action
+            </span>
+            <span>
+              <strong className="text-ic-text">{surface.declarative}</strong> declarative
+            </span>
+            <span>
+              <strong className="text-ic-text">{surface.approval}</strong> approval
+            </span>
+          </div>
+          {toolSurfaceContext.role === "observer" && <span className="text-[10px]">observer — read-only</span>}
         </div>
       </Panel>
 

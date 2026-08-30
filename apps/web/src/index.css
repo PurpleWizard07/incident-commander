@@ -29,3 +29,15 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/*
+ * Declarative WebMCP (plan §21.3): the browser applies this pseudo-class to
+ * a <form toolname="..."> while an agent is filling it, so the human can see
+ * at a glance that the fields in front of them were written by the agent,
+ * not typed by hand. A browser without declarative WebMCP support simply
+ * never matches this selector — harmless no-op, not a broken style.
+ */
+form:tool-form-active {
+  border-color: var(--color-ic-accent) !important;
+  box-shadow: 0 0 0 1px var(--color-ic-accent);
+}

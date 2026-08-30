@@ -187,3 +187,8 @@ export function decideApproval(
 ): Promise<{ ok: boolean; status: ApprovalStatus }> {
   return apiPost(`/api/approvals/${encodeURIComponent(approvalId)}/decide`, { decision, approvalToken, decisionNote });
 }
+
+/** Plan §8: the role switcher. Console-only — there is no `set_role` tool; the agent doesn't get to change who it's answering to. */
+export function setRole(role: string): Promise<{ role: string }> {
+  return apiPost("/api/session", { role });
+}

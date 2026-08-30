@@ -77,12 +77,19 @@ const EMPTY: ConsoleData = {
  * (state, notes, timeline, assignee) comes back inline on every /api/state
  * response, so it updates in place with no extra request.
  */
-export function useConsoleData(pollTierOverride?: PollTier): ConsoleData {
+export interface ConsoleDataHandle {
+  data: ConsoleData;
+  /** Forces an immediate poll instead of waiting for the current tier's interval — used right after an action the human just took (e.g. a role switch) that they'd otherwise wait up to 2s to see reflected. */
+  refresh: () => void;
+}
+
+export function useConsoleData(pollTierOverride?: PollTier): ConsoleDataHandle {
   const [data, setData] = useState<ConsoleData>(EMPTY);
   const seqRef = useRef(0);
   const nowMinuteRef = useRef<number | null>(null);
   const hasIncidentRef = useRef(false);
   const incidentStateRef = useRef<string | null>(null);
+  const refreshRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     let cancelled = false;
@@ -152,6 +159,11 @@ export function useConsoleData(pollTierOverride?: PollTier): ConsoleData {
       }
     }
 
+    refreshRef.current = () => {
+      if (timer) clearTimeout(timer);
+      tick();
+    };
+
     tick();
     return () => {
       cancelled = true;
@@ -160,5 +172,5 @@ export function useConsoleData(pollTierOverride?: PollTier): ConsoleData {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pollTierOverride]);
 
-  return data;
+  return { data, refresh: () => refreshRef.current() };
 }

@@ -1,15 +1,8 @@
-import { useEffect } from "react";
-import { registerImperativeTools } from "./webmcp/registerTools.js";
 import { AppShell } from "./console/AppShell.js";
 
+// Tool registration itself lives in AppShell — it's role/incident/state-
+// scoped (plan §8), so it needs the same live console data AppShell already
+// loads, not a one-time effect at the app root.
 export default function App() {
-  useEffect(() => {
-    // Tools stay registered in the background so the ChatGPT in-app browser
-    // and Chrome (WebMCP flag) can still discover and call them. All 23
-    // imperative tools register unconditionally for now — Phase 7 makes
-    // registration role/state-scoped (plan §8); this phase does not.
-    return registerImperativeTools();
-  }, []);
-
   return <AppShell />;
 }

@@ -5,6 +5,7 @@ import { MetricsChart } from "./MetricsChart.js";
 import { EvidenceTabs } from "./EvidenceTabs.js";
 import { Timeline } from "./Timeline.js";
 import { EvidenceSpotlight } from "./EvidenceSpotlight.js";
+import { AddNoteForm, CreateIncidentForm } from "./DeclarativeForms.js";
 import { useGlowingCall } from "./toolActivity.js";
 import type { ConsoleData } from "./useConsoleData.js";
 
@@ -37,7 +38,7 @@ function IncidentHeader({ incident, glowing }: { incident: Incident; glowing: bo
   );
 }
 
-export function IncidentWorkspace({ data }: { data: ConsoleData }) {
+export function IncidentWorkspace({ data, refresh }: { data: ConsoleData; refresh: () => void }) {
   if (data.error) {
     return <div className="p-4 text-sm text-ic-down">Failed to load console data: {data.error}</div>;
   }
@@ -53,7 +54,7 @@ export function IncidentWorkspace({ data }: { data: ConsoleData }) {
     );
   }
 
-  return <Loaded data={data} incident={data.incident} />;
+  return <Loaded data={data} incident={data.incident} refresh={refresh} />;
 }
 
 /**
@@ -62,7 +63,7 @@ export function IncidentWorkspace({ data }: { data: ConsoleData }) {
  * exists — hooks can't be conditional, and the loading/error branches above
  * return before any incident is available.
  */
-function Loaded({ data, incident }: { data: ConsoleData; incident: Incident }) {
+function Loaded({ data, incident, refresh }: { data: ConsoleData; incident: Incident; refresh: () => void }) {
   const headerGlow = useGlowingCall(["get_active_incidents", "get_incident"]);
   const topologyGlow = useGlowingCall(["get_service_health", "get_service_dependencies"]);
   const metricsGlow = useGlowingCall(["get_recent_deployments", "compare_metrics"]);
@@ -106,6 +107,25 @@ function Loaded({ data, incident }: { data: ConsoleData; incident: Incident }) {
 
         <Panel title="TIMELINE" className="h-56 shrink-0" glow={timelineGlow && (timelineGlow.pending ? "pending" : "settled")}>
           <Timeline events={incident.timeline} changes={data.changes} />
+        </Panel>
+
+        {/* Declarative WebMCP (plan §21.3) — record-changing actions, matched to a lighter risk
+            tier than the approval-gated production actions: the agent fills the form, a human
+            still has to press Submit. Chrome discovers a declarative tool purely from the
+            `<form toolname>` element being in the DOM — there is no imperative unregister call
+            for it, so "observer sees no action tools" (plan §8.1) means literally not rendering
+            these forms at all for that role, not just hiding them with CSS. */}
+        <Panel title="ACTIONS" className="h-64 shrink-0">
+          {data.role === "observer" ? (
+            <div className="flex h-full items-center justify-center p-3 text-center text-[11px] text-ic-text-dim">
+              Observer role — no actions available.
+            </div>
+          ) : (
+            <div className="flex h-full flex-col gap-2 overflow-y-auto p-2">
+              <AddNoteForm incidentId={incident.id} onSubmitted={refresh} />
+              <CreateIncidentForm onSubmitted={refresh} />
+            </div>
+          )}
         </Panel>
       </div>
       <EvidenceSpotlight />

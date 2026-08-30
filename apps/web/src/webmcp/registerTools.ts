@@ -96,16 +96,76 @@ function instrument(tool: (typeof ALL_TOOLS)[number]) {
   };
 }
 
+export interface ToolSurfaceContext {
+  /** null = no incident selected (there's always exactly one in this build, but the mechanism supports the general case). */
+  incidentId: string | null;
+  role: string;
+  incidentState: string | null;
+  hasPendingApproval: boolean;
+}
+
 /**
- * Registers all 23 imperative tools (plan §6.3-§6.5) via
- * document.modelContext.registerTool(). Registration is still static/
- * unconditional here — Phase 3 registered investigation tools this same
- * way, and dynamic registration (role/state-scoped, plan §8) is Phase 7's
- * job, not this one's. Authorization for the gated/state-gated tools is
- * enforced server-side regardless of what's registered client-side (plan
- * §12.1: "WebMCP is the agent interface, not the security boundary").
+ * The variation table from plan §8.1, as one pure function so both
+ * registration and the rail's "current tool surface" readout derive from
+ * the same source instead of two copies of the same conditions drifting
+ * apart. We unregister for AUTHORITY (observer, no incident selected, or an
+ * already-RESOLVED incident for its remediation tools) and never for
+ * feasibility — a tool that could fail right now (e.g. `rollback_deployment`
+ * when a service has no rollback target) still registers and fails loudly
+ * with an explanatory error instead of silently vanishing (plan §8.1's
+ * closing paragraph).
+ *
+ * `create_incident` and `add_incident_note` are deliberately absent: they're
+ * declarative-only now (plan §21.3's forms in DeclarativeForms.tsx). Chrome's
+ * real WebMCP implementation throws `InvalidStateError: Duplicate tool name`
+ * if the same name is registered both declaratively (the `<form toolname>`
+ * parses on mount, before this effect ever runs) and imperatively — confirmed
+ * empirically, not a hypothetical. See phase-summary.md's Phase 7 decisions.
  */
-export function registerImperativeTools(): () => void {
+export function selectRegisteredTools(ctx: ToolSurfaceContext) {
+  const tools: (typeof ALL_TOOLS)[number][] = [...INVESTIGATION_TOOLS];
+  if (ctx.role === "observer") return tools;
+
+  if (ctx.incidentId === null) return tools;
+
+  if (ctx.incidentState !== "RESOLVED") {
+    tools.push(assignIncident, resolveIncident, rollbackDeployment, restartService, scaleService, disableFeatureFlag);
+  }
+  tools.push(getPendingApprovals, requestApproval);
+  if (ctx.hasPendingApproval) tools.push(recordApproval);
+  return tools;
+}
+
+/**
+ * Breakdown for the activity rail's "current tool surface" readout (plan
+ * §8.2). `declarative` isn't derived from `selectRegisteredTools` — those
+ * two tools are never in that list (see above) — it mirrors the same
+ * visibility condition `IncidentWorkspace` uses to render (or not render)
+ * the `<form toolname>` elements, since that's the only way a declarative
+ * tool actually appears or disappears.
+ */
+export function describeToolSurface(ctx: ToolSurfaceContext): { read: number; action: number; approval: number; declarative: number } {
+  const tools = selectRegisteredTools(ctx);
+  return {
+    read: tools.filter((t) => (INVESTIGATION_TOOLS as unknown[]).includes(t)).length,
+    action: tools.filter((t) => (ACTION_TOOLS as unknown[]).includes(t)).length,
+    approval: tools.filter((t) => (APPROVAL_TOOLS as unknown[]).includes(t)).length,
+    declarative: ctx.role !== "observer" && ctx.incidentId !== null ? 2 : 0,
+  };
+}
+
+/**
+ * Registers whichever tools `selectRegisteredTools` says belong to the
+ * current context, via document.modelContext.registerTool(). Callers
+ * (AppShell) create one AbortController-backed "generation" per distinct
+ * `(incidentId, role, incidentState, hasPendingApproval)` combination — see
+ * plan §8.2 — tearing the previous generation down (which fires `toolchange`
+ * natively) before building the next. Authorization for the gated/
+ * state-gated tools is enforced server-side regardless of what's registered
+ * client-side (plan §12.1: "WebMCP is the agent interface, not the security
+ * boundary").
+ */
+export function registerDynamicTools(ctx: ToolSurfaceContext): () => void {
   if (typeof document === "undefined" || !document.modelContext) {
     console.warn(
       "[webmcp] document.modelContext is not available in this browser. " +
@@ -116,8 +176,13 @@ export function registerImperativeTools(): () => void {
 
   const controller = new AbortController();
 
-  for (const tool of ALL_TOOLS) {
-    document.modelContext.registerTool({ ...tool, execute: instrument(tool) }, { signal: controller.signal });
+  for (const tool of selectRegisteredTools(ctx)) {
+    // registerTool() returns a Promise that can reject (e.g. a name collision
+    // with a declarative form) — always handled, never left as an unhandled
+    // rejection, regardless of what causes a given registration to fail.
+    document.modelContext.registerTool({ ...tool, execute: instrument(tool) }, { signal: controller.signal }).catch((err) => {
+      console.warn(`[webmcp] failed to register tool "${tool.name}":`, err);
+    });
   }
 
   return () => controller.abort();
