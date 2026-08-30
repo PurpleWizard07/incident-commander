@@ -57,7 +57,7 @@ deploys once Netlify is authenticated — Claude can do unattended.
 
 | # | Phase | Status | Commit | Notes |
 |---|---|---|---|---|
-| 0 | Proof (go/no-go) | ✅ done | `2e13f94`, `382dc0d` | ChatGPT in-app browser + Chrome (flag, via Inspector extension) both verified by user on 2026-08-31. Origin trial token registration in progress, non-blocking |
+| 0 | Proof (go/no-go) | ✅ done | `2e13f94`..`5f82e12` | ChatGPT in-app browser + Chrome (flag, via Inspector extension) verified by user; origin trial token registered, decoded, wired in, and live on production |
 | 1 | Simulation core | ⬜ not started | — | |
 | 2 | Backend and store | ⬜ not started | — | |
 | 3 | Investigation tool surface | ⬜ not started | — | |
@@ -120,7 +120,7 @@ Things that are broken, ugly, or postponed, so a later session does not rediscov
 | 0 | **Netlify CLI's monorepo prompt is interactive and cannot be answered non-interactively.** Any `netlify` command run from the repo root (which has 3 workspace `package.json`s) opens a "Select the project you want to work with" prompt and **crashes** (`ERR_USE_AFTER_CLOSE`) if stdin isn't a TTY. Fix: always pass `--filter @incident-commander/web` to bypass it. | Medium — silent trap for a future session that doesn't know this | Not in plan; recorded here only |
 | 0 | Because of the above, `--filter`'s implied base directory (`apps/web`) silently breaks **relative** `--dir`/`--functions` paths — a relative `--functions apps/api/src/functions` got joined onto `apps/web/`, resolved to a nonexistent folder, and **the CLI deployed successfully with zero functions and no error**. Always use an absolute path for `--functions` on manual deploys. The exact command that works: `netlify deploy --filter @incident-commander/web --no-build --dir apps/web/dist --functions "C:/Users/varad/OneDrive/Desktop/webmcp/apps/api/src/functions" --prod` | **High** — fails silently, not loudly | Not in plan; recorded here only |
 | 0 | No git-based CI/CD is wired up. Every deploy so far is a manual local `pnpm --filter web build` + `netlify deploy --prod` run by Claude. Netlify's dashboard could auto-deploy on push instead, which would sidestep the `--filter` gotcha above entirely (server-side builds don't go through the interactive CLI) — but wiring that up needs one dashboard click to authorize Netlify's GitHub App, so it needs the user. Deferred; not blocking, since manual deploys work | Low | Consider before Phase 8+, once deploys become frequent |
-| 0 | WebMCP origin trial token **not yet registered** — `index.html` has a commented placeholder. Until registered, Chrome needs the `chrome://flags/#enable-webmcp-testing` fallback (already confirmed working); the ChatGPT in-app browser needs neither and is unaffected | Low — expected, not a bug, both required surfaces already pass without it | plan §21.1 |
+| 0 | ~~WebMCP origin trial token not yet registered~~ **Resolved 2026-08-31** — token registered, decoded and verified, wired into `index.html`, deployed to production. Flag-free Chrome path not yet re-tested by a human in an actual browser (only confirmed via curl that the meta tag is present) — worth a quick check next time Chrome is open, not blocking | Low | plan §21.1 |
 | 0 | **Gemini API 403 "Your project has been denied access" / PERMISSION_DENIED.** Hit when the user tried the Inspector extension's "Interact with page" mode with a fresh AI Studio key. Widely reported on Google's own AI Developer Forum as a project-level restriction Google applies silently; self-service fixes (billing, region, fresh project) don't reliably clear it — their own guidance is "contact support." Not our bug, not blocking (Execute Tool mode already proved the pipeline works without any LLM) | Low — cosmetic, optional test path only | N/A, external to this project |
 
 ---
@@ -132,6 +132,7 @@ The riskiest unknown in the project. Re-verify after any change to tool registra
 | Date | Build | ChatGPT in-app | Chrome (OT token) | Chrome (flag / extension) | Notes |
 |---|---|---|---|---|---|
 | 2026-08-31 | `2e13f94` | ✅ pass | ⬜ not registered yet | ✅ pass | ChatGPT: agent reported checkout errorRate 0.64/baseline 0.005, latencyP95 260/baseline 240 — exact match to hardcoded data, confirms real execution not a hallucinated guess. Chrome: verified via Model Context Protocol Inspector's "Execute Tool," stable channel was v152 (flag-enabled) |
+| 2026-08-31 | `5f82e12` | — | ✅ token wired in, deployed, meta tag confirmed live on production | — | Token decoded before embedding: `{origin: https://incident-commander-461.netlify.app:443, feature: WebMCP, expiry: 2026-11-17}` — matches exactly. Not yet re-tested flag-free in an actual browser; do that opportunistically, not blocking |
 
 ---
 
