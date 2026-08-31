@@ -11,6 +11,9 @@ import type {
   TimelineEvent,
   Approval,
   ApprovalStatus,
+  Alert,
+  Runbook,
+  AuditRecord,
 } from "@incident-commander/shared";
 
 export interface ActiveIncidentSummary {
@@ -175,6 +178,21 @@ export const SCENARIO_IDS = ["INC-4821", "INC-4822", "INC-4823", "INC-4824", "IN
 /** Console-only, never a tool (plan §11) — the scenario picker and `?scenario=`/`?seed=` URL params. */
 export function loadScenario(scenarioId: string, seed?: string): Promise<{ scenarioId: string; seed: number; nowMinute: number }> {
   return apiPost("/api/sim/scenario", { scenarioId, seed });
+}
+
+/** Console-only (never a tool) — the Alerts nav page. `inspect_alert` (the tool) stays lookup-by-id only. */
+export function getAllAlerts(): Promise<{ alerts: Alert[] }> {
+  return apiGet("/api/alerts");
+}
+
+/** The Runbooks nav page reuses the same search `get_runbook` uses — with no filters, every runbook matches. */
+export function getAllRunbooks(): Promise<{ runbook?: Runbook; runbooks?: Runbook[]; note?: string }> {
+  return apiGet("/api/runbooks");
+}
+
+/** The Activity nav page's audit table — the append-only log itself (plan §2.1's "source of truth"). */
+export function getAudit(): Promise<{ events: AuditRecord[] }> {
+  return apiGet("/api/audit");
 }
 
 /**

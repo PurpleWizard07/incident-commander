@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Header } from "./Header.js";
-import { Nav } from "./Nav.js";
+import { Nav, type Section } from "./Nav.js";
 import { IncidentWorkspace } from "./IncidentWorkspace.js";
+import { ServicesPage, DeploymentsPage, AlertsPage, RunbooksPage, ActivityPage } from "./SupportingPages.js";
 import { AgentActivityRail } from "./AgentActivityRail.js";
 import { useConsoleData } from "./useConsoleData.js";
 import { ToolActivityProvider } from "./toolActivity.js";
@@ -16,6 +17,7 @@ import { setRole as apiSetRole } from "./api.js";
  */
 export function AppShell() {
   const { data, refresh, switchScenario } = useConsoleData();
+  const [section, setSection] = useState<Section>("incidents");
 
   const incidentId = data.incident?.id ?? null;
   const incidentState = data.incident?.state ?? null;
@@ -51,9 +53,14 @@ export function AppShell() {
             onScenarioChange={handleScenarioChange}
           />
           <div className="grid min-h-0 flex-1 grid-cols-[180px_1fr_340px]">
-            <Nav />
+            <Nav section={section} onSectionChange={setSection} />
             <main className="min-h-0 min-w-0">
-              <IncidentWorkspace data={data} refresh={refresh} />
+              {section === "incidents" && <IncidentWorkspace data={data} refresh={refresh} />}
+              {section === "services" && <ServicesPage serviceHealth={data.serviceHealth} />}
+              {section === "deployments" && <DeploymentsPage deployments={data.deployments} />}
+              {section === "alerts" && <AlertsPage />}
+              {section === "runbooks" && <RunbooksPage />}
+              {section === "activity" && <ActivityPage />}
             </main>
             <aside className="min-h-0 border-l border-ic-border">
               <AgentActivityRail

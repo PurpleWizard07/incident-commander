@@ -134,6 +134,10 @@ export default async (req: Request): Promise<Response> => {
           })
         );
       }
+      if (path === "/api/alerts") {
+        const session = await loadSession(sessionId);
+        return json(alertsRoute.getAllAlerts(session));
+      }
       if ((params = match("/api/alerts/:id", path))) {
         const session = await loadSession(sessionId);
         return json(alertsRoute.inspectAlert(session, params.id));
