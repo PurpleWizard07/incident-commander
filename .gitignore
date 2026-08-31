@@ -10,6 +10,21 @@ dist/
 deno.lock
 
 # Local planning/tracking docs — kept on disk for cross-session memory, never pushed.
-# README.md is the only markdown file this repo tracks in git.
-*.md
-!README.md
+# These are internal working memory, not submission deliverables. Everything
+# else in markdown (README.md, evals/RESULTS.md, docs/*.md — all explicitly
+# required submission artifacts per the plan's Phase 10/11) IS tracked; this
+# rule used to be a blanket `*.md` / `!README.md`, which was too broad and
+# would have silently excluded those required files too (caught while
+# building Phase 10's eval suite — see phase-summary.md's decisions log).
+/CLAUDE.md
+/AGENTS.md
+/phase.md
+/phase-summary.md
+/implementation-plan.md
+/incident-commander.md
+/implementation-plan-review.md
+/details.md
+
+# Raw per-run eval trace logs — verbose mechanical evidence, not the deliverable.
+# evals/RESULTS.md (the aggregated pass/fail summary) is what's committed.
+/evals/traces/
