@@ -203,7 +203,7 @@ export function MetricsChart({ series, deployments }: { series: RawMetricSeries[
               key={w.label}
               onClick={() => setWindowMinutes(w.minutes)}
               aria-pressed={w.minutes === windowMinutes}
-              className={`relative px-1.5 py-[3px] font-mono text-[9.5px] tracking-[0.06em] transition-colors duration-150 ${
+              className={`relative flex min-h-[24px] items-center justify-center px-1.5 font-mono text-[9.5px] tracking-[0.06em] transition-colors duration-150 ${
                 w.minutes === windowMinutes ? "text-ic-text" : "text-ic-text-faint hover:text-ic-text-dim"
               }`}
             >

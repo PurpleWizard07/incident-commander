@@ -86,7 +86,7 @@ breakdown in [`docs/WEBMCP.md`](docs/WEBMCP.md).
 
 | | |
 |---|---|
-| **Lighthouse** | Agentic Browsing **4/4** checks passing; performance 0.98, accessibility 1.0, best-practices 1.0, SEO 1.0 (desktop preset, matching the judge environment). Report: [`docs/lighthouse-report.report.html`](docs/lighthouse-report.report.html) · Screenshot: [`docs/lighthouse-scores.png`](docs/lighthouse-scores.png) |
+| **Lighthouse** | Agentic Browsing **4/4** checks passing; performance 0.99, accessibility 1.0, best-practices 1.0, SEO 1.0 (desktop preset, matching the judge environment; performance samples 0.98–0.99 run to run). Report: [`docs/lighthouse-report.report.html`](docs/lighthouse-report.report.html) · Screenshot: [`docs/lighthouse-scores.png`](docs/lighthouse-scores.png) |
 | **Eval suite** | 30 hand-written cases across all 5 scenarios, **58/60 passed (96.7%)**, including a tuned-vs-naive tool-description ablation. Full results and methodology, including the one genuine miss (a self-found, root-caused eval-suite gap, not a description-quality issue): [`evals/RESULTS.md`](evals/RESULTS.md) |
 | **CI** | Every push: typecheck across all 4 workspace packages, 46 simulation-engine tests (determinism, evidence integrity, correlation contract, remediation, phase shapes), and a live Lighthouse run against production. [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
 

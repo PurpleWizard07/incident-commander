@@ -10,16 +10,19 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <!--
       Type system (design pass, 2026-08-31): Instrument Sans for UI + display, IBM Plex Mono for
-      every numeral, label and data row. `display=swap` plus a matched fallback stack in index.css
-      keeps this off the critical render path — the prior Lighthouse regression was animation and
-      backdrop-filter, not webfonts, and this stays measured the same way.
+      every numeral, label and data row. The @font-face rules live in src/index.css and the woff2
+      files are served from this origin out of public/fonts/ — see that folder's README.txt for
+      licensing (both families are SIL OFL 1.1) and for how to regenerate them.
+
+      There is deliberately no stylesheet link to fonts.googleapis.com and no preconnect to
+      fonts.gstatic.com. Both were measured against production and both cost real time: the
+      stylesheet link is render blocking (440ms, FCP 2.9s, performance 0.98 -> 0.88), and even with
+      that removed the cross-origin font fetch cost 0.3s of LCP, because the LCP element is the
+      incident masthead title and it waits on the display face.
     -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
-    />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/instrument-sans-latin-var.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/ibm-plex-mono-latin-400.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/ibm-plex-mono-latin-500.woff2" />
     <title>Incident Commander</title>
     <!--
       WebMCP origin trial token, scoped to https://incident-commander-461.netlify.app, expires

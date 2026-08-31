@@ -85,7 +85,7 @@ export function Timeline({
               key={s}
               onClick={() => toggle(s)}
               aria-pressed={on}
-              className={`flex items-center gap-1.5 rounded-[4px] px-1.5 py-1 font-mono text-[9.5px] uppercase tracking-[0.12em] transition-all duration-150 ${
+              className={`flex min-h-[24px] items-center gap-1.5 rounded-[4px] px-1.5 font-mono text-[9.5px] uppercase tracking-[0.12em] transition-all duration-150 ${
                 on ? "text-ic-text-dim" : "text-ic-text-faint hover:text-ic-text-dim"
               }`}
             >

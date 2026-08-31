@@ -17,7 +17,7 @@
    we already use a chip language for filters — reusing it for navigation
    flattened the hierarchy. */
 export function tabButton(active: boolean, extra = ""): string {
-  return `relative -mb-px border-b px-3 pb-2 pt-1 font-mono text-[10.5px] font-medium uppercase tracking-[0.14em] transition-colors duration-150 ${
+  return `relative -mb-px inline-flex min-h-[30px] items-center border-b px-3 pb-2 pt-1 font-mono text-[10.5px] font-medium uppercase tracking-[0.14em] transition-colors duration-150 ${
     active
       ? "border-ic-text text-ic-text"
       : "border-transparent text-ic-text-faint hover:border-ic-border-strong hover:text-ic-text-dim"
@@ -28,16 +28,24 @@ export function tabButton(active: boolean, extra = ""): string {
    Genuinely a toggle: off is an outline, on is filled. Square-ish, 5px, so
    it never gets mistaken for a status badge (which is a full pill). */
 export function chipToggle(active: boolean, extra = ""): string {
-  return `rounded-[5px] px-2 py-1 font-mono text-[10px] font-medium tracking-[0.06em] transition-all duration-150 ease-out active:scale-[0.97] ${
+  return `inline-flex min-h-[24px] items-center rounded-[5px] px-2 font-mono text-[10px] font-medium tracking-[0.06em] transition-all duration-150 ease-out active:scale-[0.97] ${
     active
       ? "bg-ic-panel-3 text-ic-text ring-1 ring-inset ring-ic-border-strong"
       : "text-ic-text-faint ring-1 ring-inset ring-ic-border hover:text-ic-text-dim hover:ring-ic-border-strong"
   } ${extra}`;
 }
 
-/** Segmented control — one continuous instrument switch, not N buttons. */
+/**
+ * Segmented control — one continuous instrument switch, not N buttons.
+ *
+ * `min-h-[26px]` is not cosmetic. WCAG 2.2 requires a 24x24 minimum target, and
+ * because a segmented control has no gap between its segments it cannot fall
+ * back on the spacing exemption — at the original `py-1` these measured 22px
+ * tall and a real Lighthouse run dropped accessibility from 1.0 to 0.96 on this
+ * control alone. Any control this small in this design needs the floor.
+ */
 export function segment(active: boolean, extra = ""): string {
-  return `relative px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.1em] transition-colors duration-150 ${
+  return `relative flex min-h-[26px] items-center justify-center px-2.5 font-mono text-[10px] font-medium uppercase tracking-[0.1em] transition-colors duration-150 ${
     active ? "text-ic-bg" : "text-ic-text-faint hover:text-ic-text-dim"
   } ${extra}`;
 }
