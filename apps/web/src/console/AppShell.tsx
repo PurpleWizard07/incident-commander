@@ -15,7 +15,7 @@ import { setRole as apiSetRole } from "./api.js";
  * reflows — CLS discipline applies to the shell itself, not just its panels.
  */
 export function AppShell() {
-  const { data, refresh } = useConsoleData();
+  const { data, refresh, switchScenario } = useConsoleData();
 
   const incidentId = data.incident?.id ?? null;
   const incidentState = data.incident?.state ?? null;
@@ -34,6 +34,10 @@ export function AppShell() {
     refresh();
   }
 
+  async function handleScenarioChange(scenarioId: string) {
+    await switchScenario(scenarioId);
+  }
+
   return (
     <ToolActivityProvider>
       <EvidenceJumpProvider>
@@ -44,6 +48,7 @@ export function AppShell() {
             nowMinute={data.nowMinute || undefined}
             clockMode={incidentState === "RECOVERING" ? "accelerated" : "frozen"}
             onRoleChange={handleRoleChange}
+            onScenarioChange={handleScenarioChange}
           />
           <div className="grid min-h-0 flex-1 grid-cols-[180px_1fr_340px]">
             <Nav />

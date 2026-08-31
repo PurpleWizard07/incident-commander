@@ -1,5 +1,5 @@
 import { apiGet, apiPost } from "../apiClient.js";
-import { capText, hhmm } from "../shape.js";
+import { capText, hhmm, sanitizeUntrusted, wrapUntrusted } from "../shape.js";
 import { REASON_PROPERTY, toolResult } from "./shared.js";
 
 const SERVICE_ENUM = ["frontend", "checkout", "payments", "auth", "database", "queue", "notifications"];
@@ -72,9 +72,10 @@ export const getIncident = {
       incident.pendingApprovalId ? `Pending approval: ${incident.pendingApprovalId}.` : "No pending approval.",
     ];
     if (incident.notes.length > 0) {
-      lines.push("Recent notes:");
-      for (const n of incident.notes) lines.push(`  [${hhmm(n.at)}] (${n.authorKind}) ${n.note}`);
-      if (incident.notesTruncated) lines.push("  (earlier notes omitted)");
+      const untrusted = ["Recent notes:"];
+      for (const n of incident.notes) untrusted.push(`  [${hhmm(n.at)}] (${n.authorKind}) ${sanitizeUntrusted(n.note)}`);
+      if (incident.notesTruncated) untrusted.push("  (earlier notes omitted)");
+      lines.push(wrapUntrusted(untrusted.join("\n")));
     }
     lines.push("Recent timeline:");
     for (const t of incident.timeline) lines.push(`  [${hhmm(t.at)}] ${t.summary}`);

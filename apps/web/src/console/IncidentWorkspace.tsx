@@ -7,6 +7,7 @@ import { Timeline } from "./Timeline.js";
 import { EvidenceSpotlight } from "./EvidenceSpotlight.js";
 import { AddNoteForm, CreateIncidentForm } from "./DeclarativeForms.js";
 import { useGlowingCall } from "./toolActivity.js";
+import { computeConfidence, type ConfidenceLevel } from "./confidence.js";
 import type { ConsoleData } from "./useConsoleData.js";
 
 function severityColor(severity: string): string {
@@ -15,7 +16,15 @@ function severityColor(severity: string): string {
   return "var(--color-ic-text-dim)";
 }
 
+function confidenceColor(level: ConfidenceLevel): string {
+  if (level === "Strong") return "var(--color-ic-healthy)";
+  if (level === "Moderate") return "var(--color-ic-degraded)";
+  return "var(--color-ic-text-dim)";
+}
+
 function IncidentHeader({ incident, glowing }: { incident: Incident; glowing: boolean }) {
+  const confidence = computeConfidence(incident);
+  const tooltip = `${confidence.supportingSignals} supporting signal(s) · ${confidence.alternativesFalsified} alternative(s) falsified · ${confidence.unexplainedObservations} unexplained observation(s)`;
   return (
     <div
       className={`flex h-14 shrink-0 items-center gap-3 border-b px-3 transition-colors duration-300 ${
@@ -32,6 +41,13 @@ function IncidentHeader({ incident, glowing }: { incident: Incident; glowing: bo
       </span>
       <span className="rounded bg-ic-panel-2 px-1.5 py-0.5 font-mono text-[11px] text-ic-text">
         {incident.state}
+      </span>
+      <span
+        title={tooltip}
+        className="flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[11px]"
+        style={{ borderColor: confidenceColor(confidence.level), color: confidenceColor(confidence.level) }}
+      >
+        confidence: {confidence.level}
       </span>
       <span className="ml-auto font-mono text-[11px] text-ic-text-dim">opened {incident.openedAt.slice(11, 16)}</span>
     </div>

@@ -9,6 +9,7 @@ import {
   queryLogs,
   searchTraces,
   getMetricSeries,
+  loadScenario,
   type ServiceHealthSummary,
   type RawMetricSeries,
 } from "./api.js";
@@ -81,6 +82,8 @@ export interface ConsoleDataHandle {
   data: ConsoleData;
   /** Forces an immediate poll instead of waiting for the current tier's interval — used right after an action the human just took (e.g. a role switch) that they'd otherwise wait up to 2s to see reflected. */
   refresh: () => void;
+  /** Plan §8 scenario picker: loads a different scenario/seed into this session, then refreshes immediately. */
+  switchScenario: (scenarioId: string, seed?: string) => Promise<void>;
 }
 
 export function useConsoleData(pollTierOverride?: PollTier): ConsoleDataHandle {
@@ -90,6 +93,7 @@ export function useConsoleData(pollTierOverride?: PollTier): ConsoleDataHandle {
   const hasIncidentRef = useRef(false);
   const incidentStateRef = useRef<string | null>(null);
   const refreshRef = useRef<() => void>(() => {});
+  const switchScenarioRef = useRef<(scenarioId: string, seed?: string) => Promise<void>>(async () => {});
 
   useEffect(() => {
     let cancelled = false;
@@ -164,7 +168,29 @@ export function useConsoleData(pollTierOverride?: PollTier): ConsoleDataHandle {
       tick();
     };
 
-    tick();
+    switchScenarioRef.current = async (scenarioId, seed) => {
+      if (timer) clearTimeout(timer);
+      await loadScenario(scenarioId, seed);
+      // A fresh session: every "have we already seen this" ref must forget the old one.
+      seqRef.current = 0;
+      nowMinuteRef.current = null;
+      hasIncidentRef.current = false;
+      incidentStateRef.current = null;
+      setData(EMPTY);
+      await tick();
+    };
+
+    // Plan §8: `?scenario=`/`?seed=` load a specific scenario before the first poll,
+    // instead of whatever this session's session was last left on.
+    const params = new URLSearchParams(window.location.search);
+    const scenarioParam = params.get("scenario");
+    const seedParam = params.get("seed") ?? undefined;
+    if (scenarioParam) {
+      switchScenarioRef.current(scenarioParam, seedParam);
+    } else {
+      tick();
+    }
+
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
@@ -172,5 +198,9 @@ export function useConsoleData(pollTierOverride?: PollTier): ConsoleDataHandle {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pollTierOverride]);
 
-  return { data, refresh: () => refreshRef.current() };
+  return {
+    data,
+    refresh: () => refreshRef.current(),
+    switchScenario: (scenarioId, seed) => switchScenarioRef.current(scenarioId, seed),
+  };
 }

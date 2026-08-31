@@ -170,6 +170,13 @@ export function getState(sinceSeq: number): Promise<StatePollResult> {
   return apiGet("/api/state", { since: sinceSeq.toString() });
 }
 
+export const SCENARIO_IDS = ["INC-4821", "INC-4822", "INC-4823", "INC-4824", "INC-4825"] as const;
+
+/** Console-only, never a tool (plan §11) — the scenario picker and `?scenario=`/`?seed=` URL params. */
+export function loadScenario(scenarioId: string, seed?: string): Promise<{ scenarioId: string; seed: number; nowMinute: number }> {
+  return apiPost("/api/sim/scenario", { scenarioId, seed });
+}
+
 /**
  * Console-only (never a tool) — mints the single-use approval token, only
  * reachable from a trusted human click (plan §12.3). Must be called
