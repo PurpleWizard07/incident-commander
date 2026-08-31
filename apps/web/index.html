@@ -8,6 +8,18 @@
       content="Incident Commander: a WebMCP-native production incident-response console where an AI agent investigates through structured tools while a human retains authority over production changes."
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!--
+      Type system (design pass, 2026-08-31): Instrument Sans for UI + display, IBM Plex Mono for
+      every numeral, label and data row. `display=swap` plus a matched fallback stack in index.css
+      keeps this off the critical render path — the prior Lighthouse regression was animation and
+      backdrop-filter, not webfonts, and this stays measured the same way.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+    />
     <title>Incident Commander</title>
     <!--
       WebMCP origin trial token, scoped to https://incident-commander-461.netlify.app, expires

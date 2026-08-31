@@ -1,5 +1,6 @@
-import type { Incident } from "@incident-commander/shared";
-import { Panel, Skeleton } from "./Skeleton.js";
+import type { Incident, ServiceId } from "@incident-commander/shared";
+import { Region, Skeleton, VitalsStrip, type Vital } from "./Surface.js";
+import { IncidentMasthead } from "./Masthead.js";
 import { Topology } from "./Topology.js";
 import { MetricsChart } from "./MetricsChart.js";
 import { EvidenceTabs } from "./EvidenceTabs.js";
@@ -9,68 +10,123 @@ import { AddNoteForm, CreateIncidentForm } from "./DeclarativeForms.js";
 import { useGlowingCall } from "./toolActivity.js";
 import { computeConfidence, type ConfidenceLevel } from "./confidence.js";
 import type { ConsoleData } from "./useConsoleData.js";
-import { badge, type BadgeTone } from "./ui.js";
+import type { ServiceHealthSummary } from "./api.js";
 
-function severityTone(severity: string): BadgeTone {
-  if (severity === "SEV-1") return "critical";
-  if (severity === "SEV-2") return "warning";
-  return "neutral";
+function glowState(g: { pending: boolean } | null): "pending" | "settled" | null {
+  if (!g) return null;
+  return g.pending ? "pending" : "settled";
 }
 
-function confidenceTone(level: ConfidenceLevel): BadgeTone {
+function confidenceTone(level: ConfidenceLevel): Vital["tone"] {
   if (level === "Strong") return "healthy";
-  if (level === "Moderate") return "warning";
-  return "neutral";
+  if (level === "Moderate") return "degraded";
+  return "ink";
 }
 
-function IncidentHeader({ incident, glowing }: { incident: Incident; glowing: boolean }) {
+function errorTone(rate: number): Vital["tone"] {
+  if (rate >= 0.05) return "down";
+  if (rate >= 0.01) return "degraded";
+  return "healthy";
+}
+
+/**
+ * The vitals are derived from data the console has already loaded for the
+ * topology and the evidence tabs — no new request, and deliberately no ground
+ * truth (plan §3.9). Confidence in particular is counted from what the agent
+ * itself cited and admitted, never self-reported and never from the scenario
+ * (plan §9.2, `confidence.ts`).
+ */
+function buildVitals(incident: Incident, health: Partial<Record<ServiceId, ServiceHealthSummary>>): Vital[] {
+  const affected = incident.affectedServices
+    .map((s) => health[s])
+    .filter((h): h is ServiceHealthSummary => h !== undefined);
+  const worstError = affected.reduce((m, h) => Math.max(m, h.errorRate), 0);
+  const worstLatency = affected.reduce((m, h) => Math.max(m, h.latencyP95Ms ?? 0), 0);
+  const unhealthy = Object.values(health).filter((h) => h && h.status !== "healthy").length;
+  const known = Object.keys(health).length;
   const confidence = computeConfidence(incident);
-  const tooltip = `${confidence.supportingSignals} supporting signal(s) · ${confidence.alternativesFalsified} alternative(s) falsified · ${confidence.unexplainedObservations} unexplained observation(s)`;
-  return (
-    <div
-      className={`flex h-14 shrink-0 items-center gap-3 border-b bg-ic-bg-elevated px-4 transition-colors duration-300 ${
-        glowing ? "border-ic-accent/60 shadow-[inset_0_-1px_0_0_var(--color-ic-accent)]" : "border-ic-border"
-      }`}
-    >
-      <span className="font-mono text-sm font-semibold tracking-tight text-ic-text">{incident.id}</span>
-      <span className="text-sm text-ic-text-dim">{incident.title}</span>
-      <span className={badge(severityTone(incident.severity))}>{incident.severity}</span>
-      <span className={badge("neutral")}>{incident.state}</span>
-      <span title={tooltip} className={badge(confidenceTone(confidence.level))}>
-        confidence: {confidence.level}
-      </span>
-      <span className="ml-auto font-mono text-[11px] tabular-nums text-ic-text-faint">
-        opened {incident.openedAt.slice(11, 16)}
-      </span>
-    </div>
-  );
+
+  return [
+    {
+      label: "Error rate",
+      value: affected.length ? (worstError * 100).toFixed(2) : "—",
+      unit: affected.length ? "%" : undefined,
+      tone: affected.length ? errorTone(worstError) : "ink",
+      note: "worst",
+    },
+    {
+      label: "Latency p95",
+      value: worstLatency ? worstLatency.toFixed(0) : "—",
+      unit: worstLatency ? "ms" : undefined,
+      tone: !worstLatency ? "ink" : worstLatency >= 1000 ? "down" : worstLatency >= 400 ? "degraded" : "healthy",
+      note: worstLatency ? "worst" : "no data",
+    },
+    {
+      label: "Unhealthy",
+      value: known ? String(unhealthy) : "—",
+      unit: known ? `/ ${known}` : undefined,
+      tone: unhealthy >= 3 ? "down" : unhealthy > 0 ? "degraded" : "healthy",
+      note: "services",
+    },
+    {
+      label: "Confidence",
+      value: confidence.level,
+      tone: confidenceTone(confidence.level),
+      note: `${confidence.supportingSignals} cited`,
+      title: `${confidence.supportingSignals} supporting signal(s) · ${confidence.alternativesFalsified} alternative(s) falsified · ${confidence.unexplainedObservations} unexplained observation(s)`,
+    },
+  ];
 }
 
 export function IncidentWorkspace({ data, refresh }: { data: ConsoleData; refresh: () => void }) {
   if (data.error) {
     return (
-      <div className="flex h-full items-center justify-center p-4">
-        <div className="animate-fade-up rounded-xl border border-ic-down/30 bg-ic-down/[0.06] px-4 py-3 text-sm text-ic-down">
-          Failed to load console data: {data.error}
+      <div className="flex h-full items-center justify-center p-6">
+        <div className="animate-fade-up max-w-md rounded-lg border border-ic-down/30 bg-ic-down/[0.06] px-4 py-3.5">
+          <div className="ic-overline mb-1.5 text-ic-down">Console offline</div>
+          <p className="text-[12px] leading-relaxed text-ic-text-dim">{data.error}</p>
         </div>
       </div>
     );
   }
 
   if (!data.incident) {
-    // Mirrors `Loaded`'s exact structure — header outside the padded scroll
-    // area, then TOPOLOGY/METRICS/EVIDENCE/TIMELINE/ACTIONS in that order at
-    // their real heights — so nothing shifts size or position when the real
-    // incident data replaces it (plan §21.2).
+    // Mirrors `Loaded`'s exact structure at its real heights — masthead, vitals
+    // strip, the two-up analysis row, evidence, the two-up bottom row — so
+    // nothing shifts size or position when the real incident arrives (plan §21.2).
     return (
       <div className="flex h-full flex-col">
-        <Skeleton className="h-14 shrink-0" />
-        <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-hidden p-3.5">
-          <Skeleton className="h-80 shrink-0" />
-          <Skeleton className="h-72 shrink-0" />
-          <Skeleton className="h-80 shrink-0" />
-          <Skeleton className="h-56 shrink-0" />
-          <Skeleton className="h-64 shrink-0" />
+        <div className="shrink-0 px-5 pb-4 pt-4">
+          <Skeleton className="h-4 w-52" />
+          <Skeleton className="mt-3 h-8 w-[26rem]" />
+          <Skeleton className="mt-3 h-3 w-72" />
+        </div>
+        <div className="flex shrink-0 items-stretch border-y border-ic-border">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className={`flex-1 px-4 py-3 ${i > 0 ? "border-l border-ic-border/70" : ""}`}>
+              <Skeleton className="h-7 w-20" />
+              <Skeleton className="mt-2.5 h-2.5 w-16" />
+            </div>
+          ))}
+        </div>
+        <div className="grid h-[292px] shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] border-b border-ic-border">
+          <div className="border-r border-ic-border p-4">
+            <Skeleton className="h-full w-full" />
+          </div>
+          <div className="p-4">
+            <Skeleton className="h-full w-full" />
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 p-4">
+          <Skeleton className="h-full w-full" />
+        </div>
+        <div className="grid h-[232px] shrink-0 grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] border-t border-ic-border">
+          <div className="border-r border-ic-border p-4">
+            <Skeleton className="h-full w-full" />
+          </div>
+          <div className="p-4">
+            <Skeleton className="h-full w-full" />
+          </div>
         </div>
       </div>
     );
@@ -80,10 +136,34 @@ export function IncidentWorkspace({ data, refresh }: { data: ConsoleData; refres
 }
 
 /**
- * Split out so the panel-level glow hooks (plan §9's "which section is the
- * agent's most recent call about") only run once an incident actually
- * exists — hooks can't be conditional, and the loading/error branches above
- * return before any incident is available.
+ * ═══ The composition ═══
+ *
+ * What this replaces: a single vertically scrolling column of five identical
+ * rounded cards — TOPOLOGY (h-80), METRICS (h-72), EVIDENCE (h-80), TIMELINE
+ * (h-56), ACTIONS (h-64) — stacked in that order. On a laptop you could see
+ * about one and a half of them, so correlating a spike in the chart with a log
+ * line meant scrolling between them, which is the one thing this console exists
+ * to make unnecessary.
+ *
+ * The new layout is a real grid and it fits, whole, on a 1080p screen:
+ *
+ *   masthead        the incident, as the largest type on the page
+ *   vitals          five bare numerals, no container
+ *   TOPOLOGY | SIGNAL   side by side, because "which service" and "when did it
+ *                       start" are one question and were two scroll positions
+ *   EVIDENCE            full width and the largest region, because it holds the
+ *                       densest data and does the most work
+ *   TIMELINE | OPEN INCIDENT
+ *
+ * The note composer is docked inside the TIMELINE region rather than living in
+ * a separate ACTIONS card, because a note *is* a timeline entry — the old
+ * layout put the two 500px apart.
+ *
+ * Both `<form toolname>` elements still render unconditionally for non-observer
+ * roles. Chrome discovers a declarative tool purely from the element being in
+ * the DOM and there is no imperative unregister for it, so "an observer sees no
+ * action tools" (plan §8.1) has to mean literally not rendering them — never
+ * just hiding them with CSS.
  */
 function Loaded({ data, incident, refresh }: { data: ConsoleData; incident: Incident; refresh: () => void }) {
   const headerGlow = useGlowingCall(["get_active_incidents", "get_incident"]);
@@ -92,64 +172,77 @@ function Loaded({ data, incident, refresh }: { data: ConsoleData; incident: Inci
   const evidenceGlow = useGlowingCall(["query_logs", "search_traces", "get_recent_deployments", "get_recent_changes"]);
   const timelineGlow = useGlowingCall(["get_incident", "get_incident_timeline", "get_recent_changes"]);
 
-  return (
-    <div className="relative flex h-full flex-col">
-      <IncidentHeader incident={incident} glowing={headerGlow !== null} />
-      <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto p-3.5">
-        <Panel title="TOPOLOGY" className="h-80 shrink-0" glow={topologyGlow && (topologyGlow.pending ? "pending" : "settled")}>
-          {Object.keys(data.serviceHealth).length === 0 ? (
-            <div className="flex h-full items-center justify-center">
-              <Skeleton className="h-56 w-full" />
-            </div>
-          ) : (
-            <Topology health={data.serviceHealth} transitioningServices={incident.state === "RECOVERING" ? incident.affectedServices : []} />
-          )}
-        </Panel>
+  const isObserver = data.role === "observer";
 
-        <Panel title="METRICS" className="h-72 shrink-0" glow={metricsGlow && (metricsGlow.pending ? "pending" : "settled")}>
+  return (
+    <div className="relative flex h-full min-h-0 flex-col overflow-y-auto">
+      <IncidentMasthead incident={incident} glowing={headerGlow !== null} />
+
+      <VitalsStrip items={buildVitals(incident, data.serviceHealth)} className="border-y border-ic-border" />
+
+      <div className="grid h-[292px] shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] border-b border-ic-border">
+        <Region
+          label="Topology"
+          glow={glowState(topologyGlow)}
+          className="border-r border-ic-border"
+          bodyClassName="px-2 pb-2"
+        >
+          {Object.keys(data.serviceHealth).length === 0 ? (
+            <Skeleton className="h-full w-full" />
+          ) : (
+            <Topology
+              health={data.serviceHealth}
+              transitioningServices={incident.state === "RECOVERING" ? incident.affectedServices : []}
+            />
+          )}
+        </Region>
+
+        <Region label="Signal" glow={glowState(metricsGlow)}>
           {data.metricSeries.length === 0 ? (
-            <div className="flex h-full items-center justify-center">
-              <Skeleton className="h-56 w-full" />
+            <div className="h-full px-4 pb-4">
+              <Skeleton className="h-full w-full" />
             </div>
           ) : (
             <MetricsChart series={data.metricSeries} deployments={data.deployments} />
           )}
-        </Panel>
-
-        <Panel title="EVIDENCE" className="h-80 shrink-0" glow={evidenceGlow && (evidenceGlow.pending ? "pending" : "settled")}>
-          <EvidenceTabs
-            logs={data.logs}
-            logsNote={data.logsNote}
-            traces={data.traces}
-            tracesNote={data.tracesNote}
-            deployments={data.deployments}
-            changes={data.changes}
-          />
-        </Panel>
-
-        <Panel title="TIMELINE" className="h-56 shrink-0" glow={timelineGlow && (timelineGlow.pending ? "pending" : "settled")}>
-          <Timeline events={incident.timeline} changes={data.changes} />
-        </Panel>
-
-        {/* Declarative WebMCP (plan §21.3) — record-changing actions, matched to a lighter risk
-            tier than the approval-gated production actions: the agent fills the form, a human
-            still has to press Submit. Chrome discovers a declarative tool purely from the
-            `<form toolname>` element being in the DOM — there is no imperative unregister call
-            for it, so "observer sees no action tools" (plan §8.1) means literally not rendering
-            these forms at all for that role, not just hiding them with CSS. */}
-        <Panel title="ACTIONS" className="h-64 shrink-0">
-          {data.role === "observer" ? (
-            <div className="flex h-full items-center justify-center p-3 text-center text-[11px] text-ic-text-faint">
-              Observer role — no actions available.
-            </div>
-          ) : (
-            <div className="flex h-full flex-col gap-2.5 overflow-y-auto p-2.5">
-              <AddNoteForm incidentId={incident.id} onSubmitted={refresh} />
-              <CreateIncidentForm onSubmitted={refresh} />
-            </div>
-          )}
-        </Panel>
+        </Region>
       </div>
+
+      <Region label="Evidence" glow={glowState(evidenceGlow)} className="min-h-[184px] flex-1">
+        <EvidenceTabs
+          logs={data.logs}
+          logsNote={data.logsNote}
+          traces={data.traces}
+          tracesNote={data.tracesNote}
+          deployments={data.deployments}
+          changes={data.changes}
+        />
+      </Region>
+
+      <div
+        className={`grid h-[232px] shrink-0 border-t border-ic-border ${
+          isObserver ? "grid-cols-1" : "grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]"
+        }`}
+      >
+        <Region
+          label="Timeline"
+          glow={glowState(timelineGlow)}
+          className={isObserver ? "" : "border-r border-ic-border"}
+        >
+          <Timeline
+            events={incident.timeline}
+            changes={data.changes}
+            composer={isObserver ? null : <AddNoteForm incidentId={incident.id} onSubmitted={refresh} />}
+          />
+        </Region>
+
+        {!isObserver && (
+          <Region label="Open incident">
+            <CreateIncidentForm onSubmitted={refresh} />
+          </Region>
+        )}
+      </div>
+
       <EvidenceSpotlight />
     </div>
   );

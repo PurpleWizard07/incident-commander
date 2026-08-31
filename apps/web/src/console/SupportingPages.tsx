@@ -1,19 +1,58 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { SERVICES, SERVICE_IDS } from "@incident-commander/shared";
 import type { ServiceId, Deployment, Alert, Runbook, AuditRecord } from "@incident-commander/shared";
-import { Panel } from "./Skeleton.js";
-import { statusLabel } from "./statusColors.js";
+import { PageMasthead } from "./Masthead.js";
+import { Hint, Region, VitalsStrip, type Vital } from "./Surface.js";
+import { Topology } from "./Topology.js";
+import { statusColor as statusColorFor, statusLabel } from "./statusColors.js";
 import { getAllAlerts, getAllRunbooks, getAudit, type ServiceHealthSummary } from "./api.js";
-import { badge, type BadgeTone } from "./ui.js";
-import { ActivityIcon, RunbooksIcon } from "./icons.js";
+import { badge, dataRowClass, tdClass, theadRowClass, thClass, type BadgeTone } from "./ui.js";
+import { ActivityIcon, AgentIcon, AlertsIcon, DeploymentsIcon, HumanIcon, RunbooksIcon } from "./icons.js";
 
-function EmptyState({ icon, text }: { icon: ReactNode; text: string }) {
+/**
+ * ═══ One page shape, five times ═══
+ *
+ * Every supporting page was previously the same thing: a padded container
+ * holding a single full-height `Panel` card whose only content was a table. The
+ * card contributed a border, a shadow and an ALL-CAPS header repeating the word
+ * already in the nav — three layers of framing around a table, on a page whose
+ * entire purpose is the table.
+ *
+ * The shape here instead is: display-type masthead, mono sub-line, optional
+ * vitals strip, then the table full-bleed to the region's edges. That is the
+ * same grammar the incident workspace uses, which is what makes a screenshot of
+ * Services and a screenshot of the incident view recognisably one product.
+ */
+function Page({ children }: { children: ReactNode }) {
+  return <div className="flex h-full min-h-0 flex-col">{children}</div>;
+}
+
+/**
+ * A table that closes itself.
+ *
+ * These pages hold between one and a few dozen rows, and stretching the table
+ * container to fill a 1050px viewport left several hundred pixels of unexplained
+ * void beneath the last row — the "giant empty minimalist page" failure, in a
+ * console whose whole argument is density where density is warranted. The table
+ * now sizes to its content and ends with a rule and a row count, so the bottom
+ * of the list is a deliberate edge rather than a place the design ran out.
+ */
+function DataTable({ count, children }: { count: number; children: ReactNode }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2.5 text-ic-text-faint">
-      <span className="opacity-50">{icon}</span>
-      <span>{text}</span>
+    <div className="min-h-0 flex-1 overflow-auto border-t border-ic-border">
+      <table className="w-full font-mono text-[11px]">{children}</table>
+      <div className="flex items-center gap-3 px-3 pb-6 pt-3">
+        <span aria-hidden="true" className="h-px w-8 bg-ic-border-strong" />
+        <span className="ic-overline">
+          {count} {count === 1 ? "row" : "rows"}
+        </span>
+      </div>
     </div>
   );
+}
+
+function Th({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <th className={`${thClass} ${className}`}>{children}</th>;
 }
 
 const ALL_TOOL_NAMES = new Set([
@@ -25,16 +64,12 @@ const ALL_TOOL_NAMES = new Set([
   "record_approval", "create_incident", "add_incident_note",
 ]);
 
-const th = "px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-ic-text-faint";
-const td = "px-3 py-2";
-const row = "border-b border-ic-border/70 transition-colors duration-150 hover:bg-ic-panel-2/40";
-
 /** A runbook's `toolHint` should always name a real tool (plan §9 Phase 9 exit criterion) — styled distinctly if it somehow doesn't, rather than silently rendered as if it were fine. */
 function ToolHintChip({ tool }: { tool: string }) {
   const known = ALL_TOOL_NAMES.has(tool);
   return (
     <span
-      className={badge(known ? "accent" : "critical")}
+      className={badge(known ? "accent" : "critical", "ml-1.5 align-middle")}
       title={known ? "Resolves to a registered tool" : "Does not match any registered tool"}
     >
       {tool}
@@ -49,186 +84,329 @@ function statusTone(status: ServiceHealthSummary["status"] | undefined): BadgeTo
   return "neutral";
 }
 
+/* ══════════════════════════════════════════════════════════════════════════ */
+
 export function ServicesPage({ serviceHealth }: { serviceHealth: Partial<Record<ServiceId, ServiceHealthSummary>> }) {
+  const known = Object.values(serviceHealth).filter((h): h is ServiceHealthSummary => h !== undefined);
+  const count = (s: string) => known.filter((h) => h.status === s).length;
+  const worstError = known.reduce((m, h) => Math.max(m, h.errorRate), 0);
+  const vitals: Vital[] = [
+    { label: "Healthy", value: known.length ? String(count("healthy")) : "—", unit: `/ ${SERVICE_IDS.length}`, tone: "healthy" },
+    { label: "Degraded", value: known.length ? String(count("degraded")) : "—", tone: "degraded" },
+    { label: "Down", value: known.length ? String(count("down")) : "—", tone: "down" },
+    {
+      label: "Worst error rate",
+      value: known.length ? (worstError * 100).toFixed(2) : "—",
+      unit: known.length ? "%" : undefined,
+      tone: worstError >= 0.05 ? "down" : worstError >= 0.01 ? "degraded" : "healthy",
+    },
+  ];
+
   return (
-    <div className="flex h-full flex-col gap-3.5 p-3.5">
-      <Panel title="SERVICES" className="flex-1">
-        <div className="h-full overflow-y-auto font-mono text-[11px]">
-          <table className="w-full">
-            <thead>
-              <tr className="sticky top-0 z-[1] border-b border-ic-border bg-ic-panel">
-                <th className={th}>Service</th>
-                <th className={th}>Tier</th>
-                <th className={th}>Status</th>
-                <th className={th}>Error rate</th>
-                <th className={th}>Latency p95</th>
-                <th className={th}>Instances</th>
-                <th className={th}>Owner</th>
-                <th className={th}>Depends on</th>
+    <Page>
+      <PageMasthead
+        title="Service estate"
+        meta={
+          <>
+            {SERVICE_IDS.length} services across 3 tiers
+            <span className="mx-2 opacity-40">/</span>
+            live health, refreshed with the incident poll
+          </>
+        }
+      />
+      <VitalsStrip items={vitals} className="border-y border-ic-border" />
+      <div className="shrink-0 overflow-x-auto">
+        <table className="w-full font-mono text-[11px]">
+        <thead>
+          <tr className={theadRowClass}>
+            <Th className="w-[150px]">Service</Th>
+            <Th className="w-[60px]">Tier</Th>
+            <Th className="w-[110px]">Status</Th>
+            <Th className="w-[100px]">Error rate</Th>
+            <Th className="w-[110px]">Latency p95</Th>
+            <Th className="w-[90px]">Instances</Th>
+            <Th className="w-[140px]">Owner</Th>
+            <Th>Depends on</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {SERVICE_IDS.map((id) => {
+            const h = serviceHealth[id];
+            const s = SERVICES[id];
+            return (
+              <tr key={id} className={dataRowClass}>
+                <td className={`${tdClass} font-sans text-[12px] font-medium text-ic-text`}>{s.displayName}</td>
+                <td className={`${tdClass} ic-num text-ic-text-faint`}>T{s.tier}</td>
+                <td className={tdClass}>
+                  <span className={badge(statusTone(h?.status))}>{statusLabel(h?.status)}</span>
+                </td>
+                <td className={tdClass}>
+                  {h ? (
+                    <span className="flex items-center gap-2">
+                      <span className="ic-num w-[52px] shrink-0 text-ic-text-dim">{(h.errorRate * 100).toFixed(2)}%</span>
+                      {/* Seven percentages in a column are not comparable at a
+                          glance; seven bars are. Same sqrt scale the topology
+                          dials use, so the two views agree visually. */}
+                      <span className="relative h-[3px] w-14 overflow-hidden rounded-full bg-ic-panel-3">
+                        <span
+                          className="absolute inset-y-0 left-0 rounded-full"
+                          style={{
+                            width: `${Math.max(2, Math.sqrt(Math.min(1, h.errorRate)) * 100)}%`,
+                            background: statusColorFor(h.status),
+                          }}
+                        />
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-ic-text-faint">—</span>
+                  )}
+                </td>
+                <td className={`${tdClass} ic-num text-ic-text-dim`}>
+                  {h?.latencyP95Ms != null ? `${h.latencyP95Ms.toFixed(0)}ms` : "—"}
+                </td>
+                <td className={`${tdClass} ic-num text-ic-text-dim`}>{s.instances}</td>
+                <td className={`${tdClass} text-ic-text-dim`}>{s.owner}</td>
+                <td className={`${tdClass} text-ic-text-faint`}>{s.dependsOn.join("  ·  ") || "none"}</td>
               </tr>
-            </thead>
-            <tbody>
-              {SERVICE_IDS.map((id) => {
-                const h = serviceHealth[id];
-                const s = SERVICES[id];
-                return (
-                  <tr key={id} className={row}>
-                    <td className={`${td} font-semibold text-ic-text`}>{s.displayName}</td>
-                    <td className={`${td} text-ic-text-dim`}>{s.tier}</td>
-                    <td className={td}>
-                      <span className={badge(statusTone(h?.status))}>{statusLabel(h?.status)}</span>
-                    </td>
-                    <td className={`${td} tabular-nums text-ic-text-dim`}>{h ? `${(h.errorRate * 100).toFixed(2)}%` : "—"}</td>
-                    <td className={`${td} tabular-nums text-ic-text-dim`}>{h?.latencyP95Ms != null ? `${h.latencyP95Ms.toFixed(0)}ms` : "—"}</td>
-                    <td className={`${td} tabular-nums text-ic-text-dim`}>{s.instances}</td>
-                    <td className={`${td} text-ic-text-dim`}>{s.owner}</td>
-                    <td className={`${td} text-ic-text-faint`}>{s.dependsOn.join(", ") || "none"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
-    </div>
+            );
+          })}
+        </tbody>
+        </table>
+      </div>
+      {/* The estate's graph, not a decoration: the table answers "how is each
+          service", the graph answers "what does that reach". Same component the
+          incident workspace uses, so both views of the estate stay in sync. */}
+      <Region label="Dependencies" className="min-h-[220px] flex-1 border-t border-ic-border" bodyClassName="px-2 pb-3">
+        <Topology health={serviceHealth} />
+      </Region>
+    </Page>
   );
 }
 
+/* ══════════════════════════════════════════════════════════════════════════ */
+
 export function DeploymentsPage({ deployments }: { deployments: Deployment[] }) {
   const sorted = [...deployments].sort((a, b) => b.deployedAtMinute - a.deployedAtMinute);
+  // `riskScore` is a low/medium/high union, not a number — rank it explicitly
+  // rather than comparing strings.
+  const RISK_RANK = { low: 0, medium: 1, high: 2 } as const;
+  const riskiest = sorted.reduce<Deployment["riskScore"] | null>(
+    (m, d) => (m === null || RISK_RANK[d.riskScore] > RISK_RANK[m] ? d.riskScore : m),
+    null
+  );
+  const vitals: Vital[] = [
+    { label: "In window", value: String(sorted.length), note: "deployments", tone: "ink" },
+    {
+      label: "Highest risk",
+      value: riskiest ?? "—",
+      tone: riskiest === "high" ? "down" : riskiest === "medium" ? "degraded" : "healthy",
+    },
+    {
+      label: "Most recent",
+      value: sorted[0]?.deployedAt.slice(11, 16) ?? "—",
+      note: sorted[0]?.service,
+      tone: "ink",
+    },
+    {
+      label: "Rollbackable",
+      value: String(sorted.filter((d) => d.rollbackTargetId).length),
+      note: "have a target",
+      tone: "ink",
+    },
+  ];
+
   return (
-    <div className="flex h-full flex-col gap-3.5 p-3.5">
-      <Panel title="DEPLOYMENTS" className="flex-1">
-        <div className="h-full overflow-y-auto font-mono text-[11px]">
-          <table className="w-full">
-            <thead>
-              <tr className="sticky top-0 z-[1] border-b border-ic-border bg-ic-panel">
-                <th className={th}>Deployed</th>
-                <th className={th}>Service</th>
-                <th className={th}>Version</th>
-                <th className={th}>By</th>
-                <th className={th}>Status</th>
-                <th className={th}>Risk</th>
-                <th className={th}>Rollback target</th>
-                <th className={th}>Commit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((d) => (
-                <tr key={d.id} className={row}>
-                  <td className={`${td} text-ic-text-dim`}>{d.deployedAt.slice(0, 16).replace("T", " ")}</td>
-                  <td className={`${td} font-semibold text-ic-text`}>{d.service}</td>
-                  <td className={`${td} text-ic-accent-2`}>{d.version}</td>
-                  <td className={`${td} text-ic-text-dim`}>{d.deployedBy}</td>
-                  <td className={`${td} text-ic-text-dim`}>{d.status}</td>
-                  <td className={`${td} text-ic-text-dim`}>{d.riskScore}</td>
-                  <td className={`${td} text-ic-text-dim`}>{d.rollbackTargetId ?? "none"}</td>
-                  <td className={`max-w-[260px] truncate ${td} text-ic-text-faint`} title={d.commitMessage}>
-                    {d.commitSha} — {d.commitMessage}
-                  </td>
-                </tr>
-              ))}
-              {sorted.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-ic-text-faint">
-                    No deployments in this scenario's window.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
-    </div>
+    <Page>
+      <PageMasthead
+        title="Deployment history"
+        meta={
+          <>
+            Everything shipped inside this scenario&apos;s window
+            <span className="mx-2 opacity-40">/</span>
+            newest first
+          </>
+        }
+      />
+      <VitalsStrip items={vitals} className="border-y border-ic-border" />
+      <DataTable count={sorted.length}>
+        <thead>
+          <tr className={theadRowClass}>
+            <Th className="w-[136px]">Deployed</Th>
+            <Th className="w-[112px]">Service</Th>
+            <Th className="w-[104px]">Version</Th>
+            <Th className="w-[120px]">By</Th>
+            <Th className="w-[96px]">Status</Th>
+            <Th className="w-[60px]">Risk</Th>
+            <Th className="w-[152px]">Rollback target</Th>
+            <Th>Commit</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((d) => (
+            <tr key={d.id} className={dataRowClass}>
+              <td className={`${tdClass} ic-num text-[10px] text-ic-text-faint`}>
+                {d.deployedAt.slice(0, 16).replace("T", " ")}
+              </td>
+              <td className={`${tdClass} font-sans text-[12px] font-medium text-ic-text`}>{d.service}</td>
+              <td className={`${tdClass} font-medium text-ic-degraded`}>{d.version}</td>
+              <td className={`${tdClass} text-ic-text-dim`}>{d.deployedBy}</td>
+              <td className={`${tdClass} text-ic-text-dim`}>{d.status}</td>
+              <td className={`${tdClass} ic-num text-ic-text-dim`}>{d.riskScore}</td>
+              <td className={`${tdClass} text-ic-text-faint`}>{d.rollbackTargetId ?? "none"}</td>
+              <td className={`max-w-[300px] truncate ${tdClass} text-ic-text-faint`} title={d.commitMessage}>
+                <span className="text-ic-text-dim">{d.commitSha}</span> {d.commitMessage}
+              </td>
+            </tr>
+          ))}
+          {sorted.length === 0 && (
+            <tr>
+              <td colSpan={8} className="px-3 py-10">
+                <Hint icon={<DeploymentsIcon size={24} />}>No deployments in this scenario&apos;s window.</Hint>
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </DataTable>
+    </Page>
   );
 }
+
+/* ══════════════════════════════════════════════════════════════════════════ */
 
 export function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[] | null>(null);
   useEffect(() => {
     getAllAlerts().then((r) => setAlerts(r.alerts));
   }, []);
+
   return (
-    <div className="flex h-full flex-col gap-3.5 p-3.5">
-      <Panel title="ALERTS" className="flex-1">
-        <div className="h-full overflow-y-auto font-mono text-[11px]">
-          {alerts === null ? (
-            <div className="p-4 text-ic-text-faint">Loading…</div>
-          ) : alerts.length === 0 ? (
-            <div className="p-4 text-ic-text-faint">No alerts have fired.</div>
-          ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="sticky top-0 z-[1] border-b border-ic-border bg-ic-panel">
-                  <th className={th}>Fired</th>
-                  <th className={th}>Name</th>
-                  <th className={th}>Severity</th>
-                  <th className={th}>Service</th>
-                  <th className={th}>Condition</th>
-                  <th className={th}>Current</th>
-                  <th className={th}>Incident</th>
-                </tr>
-              </thead>
-              <tbody>
-                {alerts.map((a) => (
-                  <tr key={a.id} className={row}>
-                    <td className={`${td} tabular-nums text-ic-text-dim`}>{a.firedAt.slice(11, 16)}</td>
-                    <td className={`${td} font-semibold text-ic-text`}>{a.name}</td>
-                    <td className={`${td} text-ic-text-dim`}>{a.severity}</td>
-                    <td className={`${td} text-ic-text-dim`}>{a.service}</td>
-                    <td className={`${td} text-ic-text-dim`}>
-                      {a.metric} {a.comparator} {a.threshold}
-                    </td>
-                    <td className={`${td} tabular-nums text-ic-degraded`}>{a.currentValue}</td>
-                    <td className={`${td} text-ic-accent`}>{a.incidentId ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+    <Page>
+      <PageMasthead
+        title="Alert feed"
+        meta={
+          <>
+            Everything that has fired in this scenario
+            <span className="mx-2 opacity-40">/</span>
+            <span className="text-ic-text-dim">inspect_alert</span> reads these by id
+          </>
+        }
+        accessory={
+          alerts && alerts.length > 0 ? (
+            <div className="flex items-baseline gap-2">
+              <span className="ic-num text-[26px] text-ic-degraded">{alerts.length}</span>
+              <span className="ic-overline">firing</span>
+            </div>
+          ) : undefined
+        }
+      />
+      {alerts === null ? (
+        <div className="min-h-0 flex-1 border-t border-ic-border">
+          <Hint>Loading alerts…</Hint>
         </div>
-      </Panel>
-    </div>
+      ) : alerts.length === 0 ? (
+        <div className="min-h-0 flex-1 border-t border-ic-border">
+          <Hint icon={<AlertsIcon size={26} />}>No alerts have fired in this scenario.</Hint>
+        </div>
+      ) : (
+        <DataTable count={alerts.length}>
+          <thead>
+            <tr className={theadRowClass}>
+              <Th className="w-[80px]">Fired</Th>
+              <Th className="w-[240px]">Name</Th>
+              <Th className="w-[96px]">Severity</Th>
+              <Th className="w-[120px]">Service</Th>
+              <Th>Condition</Th>
+              <Th className="w-[104px]">Current</Th>
+              <Th className="w-[112px]">Incident</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {alerts.map((a) => (
+              <tr key={a.id} className={dataRowClass}>
+                <td className={`${tdClass} ic-num text-ic-text-faint`}>{a.firedAt.slice(11, 16)}</td>
+                <td className={`${tdClass} font-sans text-[12px] font-medium text-ic-text`}>{a.name}</td>
+                <td className={tdClass}>
+                  <span className={badge(a.severity === "SEV-1" ? "critical" : a.severity === "SEV-2" ? "warning" : "neutral")}>
+                    {a.severity}
+                  </span>
+                </td>
+                <td className={`${tdClass} text-ic-text-dim`}>{a.service}</td>
+                <td className={`${tdClass} text-ic-text-faint`}>
+                  {a.metric} <span className="text-ic-text-dim">{a.comparator}</span> {a.threshold}
+                </td>
+                <td className={`${tdClass} ic-num text-ic-degraded`}>{a.currentValue}</td>
+                <td className={`${tdClass} text-ic-accent`}>{a.incidentId ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </DataTable>
+      )}
+    </Page>
   );
 }
+
+/* ══════════════════════════════════════════════════════════════════════════ */
 
 export function RunbooksPage() {
   const [runbooks, setRunbooks] = useState<Runbook[] | null>(null);
   useEffect(() => {
     getAllRunbooks().then((r) => setRunbooks(r.runbook ? [r.runbook] : (r.runbooks ?? [])));
   }, []);
+
   return (
-    <div className="flex h-full flex-col gap-3.5 p-3.5">
-      <Panel title="RUNBOOKS" className="flex-1">
-        <div className="h-full overflow-y-auto p-4 font-mono text-[11px]">
-          {runbooks === null ? (
-            <div className="text-ic-text-faint">Loading…</div>
-          ) : runbooks.length === 0 ? (
-            <EmptyState icon={<RunbooksIcon width={32} height={32} />} text="No runbooks exist for this scenario." />
-          ) : (
-            runbooks.map((rb) => (
-              <div key={rb.id} className="mb-5 rounded-xl border border-ic-border bg-ic-panel-2/40 p-3.5">
-                <div className="text-[12px] font-semibold text-ic-text">
-                  {rb.title} <span className="font-normal text-ic-text-faint">({rb.id})</span>
+    <Page>
+      <PageMasthead
+        title="Runbooks"
+        meta={
+          <>
+            Written procedure, searchable by symptom or service
+            <span className="mx-2 opacity-40">/</span>
+            <span className="text-ic-text-dim">get_runbook</span> returns these verbatim
+          </>
+        }
+      />
+      <div className="min-h-0 flex-1 overflow-y-auto border-t border-ic-border">
+        {runbooks === null ? (
+          <Hint>Loading runbooks…</Hint>
+        ) : runbooks.length === 0 ? (
+          <Hint icon={<RunbooksIcon size={26} />}>No runbooks exist for this scenario.</Hint>
+        ) : (
+          <div className="flex max-w-[62ch] flex-col gap-9 px-5 py-6">
+            {runbooks.map((rb) => (
+              /* A runbook is a document, so this is the one place in the console
+                 that is set like one: a measured column, a real heading, and
+                 steps in a numbered gutter — not a table row and not a card. */
+              <article key={rb.id}>
+                <div className="flex items-baseline gap-3">
+                  <h2 className="ic-display text-[19px]">{rb.title}</h2>
+                  <span className="font-mono text-[10px] text-ic-text-faint">{rb.id}</span>
                 </div>
-                <div className="mt-1 text-ic-text-dim">
-                  symptoms: {rb.symptoms.join(", ")} · services: {rb.services.join(", ")}
-                </div>
-                <ol className="mt-2.5 list-inside list-decimal space-y-1.5">
+                <p className="ic-meta mt-2 text-ic-text-faint">
+                  symptoms <span className="text-ic-text-dim">{rb.symptoms.join(", ")}</span>
+                  <span className="mx-2 opacity-40">/</span>
+                  services <span className="text-ic-text-dim">{rb.services.join(", ")}</span>
+                </p>
+                <ol className="mt-4 border-l border-ic-border">
                   {rb.steps.map((s) => (
-                    <li key={s.n} className="text-ic-text">
-                      {s.text} {s.toolHint && <ToolHintChip tool={s.toolHint} />}
+                    <li key={s.n} className="relative py-2.5 pl-6 pr-2">
+                      <span className="ic-num absolute left-0 top-[11px] -translate-x-1/2 rounded-full bg-ic-bg-elevated px-1 text-[10px] text-ic-text-faint">
+                        {s.n}
+                      </span>
+                      <span className="text-[12.5px] leading-[1.55] text-ic-text-dim">{s.text}</span>
+                      {s.toolHint && <ToolHintChip tool={s.toolHint} />}
                     </li>
                   ))}
                 </ol>
-              </div>
-            ))
-          )}
-        </div>
-      </Panel>
-    </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </Page>
   );
 }
+
+/* ══════════════════════════════════════════════════════════════════════════ */
 
 function outcomeTone(outcome: AuditRecord["outcome"]): BadgeTone {
   if (outcome === "denied") return "critical";
@@ -242,48 +420,85 @@ export function ActivityPage() {
     getAudit().then((r) => setEvents(r.events));
   }, []);
   const sorted = events ? [...events].sort((a, b) => b.seq - a.seq) : [];
+  const byAgent = sorted.filter((e) => e.actor.kind === "agent").length;
+  const denied = sorted.filter((e) => e.outcome === "denied").length;
+
+  const vitals: Vital[] = [
+    { label: "Audited calls", value: String(sorted.length), tone: "ink" },
+    { label: "By the agent", value: String(byAgent), tone: "agent", note: "via WebMCP" },
+    { label: "By a human", value: String(sorted.length - byAgent), tone: "ink", note: "in the console" },
+    { label: "Denied", value: String(denied), tone: denied > 0 ? "down" : "healthy", note: "authority boundary" },
+  ];
+
   return (
-    <div className="flex h-full flex-col gap-3.5 p-3.5">
-      <Panel title="ACTIVITY / AUDIT" className="flex-1">
-        <div className="h-full overflow-y-auto font-mono text-[11px]">
-          {events === null ? (
-            <div className="p-4 text-ic-text-faint">Loading…</div>
-          ) : sorted.length === 0 ? (
-            <EmptyState icon={<ActivityIcon width={32} height={32} />} text="No audited calls yet." />
-          ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="sticky top-0 z-[1] border-b border-ic-border bg-ic-panel">
-                  <th className={th}>#</th>
-                  <th className={th}>Time</th>
-                  <th className={th}>Actor</th>
-                  <th className={th}>Tool</th>
-                  <th className={th}>Outcome</th>
-                  <th className={th}>Detail</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((e) => (
-                  <tr key={e.seq} className={row}>
-                    <td className={`${td} tabular-nums text-ic-text-faint`}>{e.seq}</td>
-                    <td className={`${td} tabular-nums text-ic-text-dim`}>{e.at.slice(11, 19)}</td>
-                    <td className={`${td} text-ic-text-dim`}>
-                      {e.actor.kind}:{e.actor.identity}
-                    </td>
-                    <td className={`${td} text-ic-text`}>{e.tool}</td>
-                    <td className={td}>
-                      <span className={badge(outcomeTone(e.outcome))}>{e.outcome}</span>
-                    </td>
-                    <td className={`max-w-[320px] truncate ${td} text-ic-text-faint`} title={e.denialReason ?? e.resultSummary}>
-                      {e.denialReason ?? e.resultSummary}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+    <Page>
+      <PageMasthead
+        title="Audit trail"
+        meta={
+          <>
+            Every tool call, in order, with its outcome
+            <span className="mx-2 opacity-40">/</span>
+            nothing happens in this console without an entry here
+          </>
+        }
+      />
+      {events !== null && sorted.length > 0 && <VitalsStrip items={vitals} className="border-y border-ic-border" />}
+      {events === null ? (
+        <div className="min-h-0 flex-1 border-t border-ic-border">
+          <Hint>Loading the audit trail…</Hint>
         </div>
-      </Panel>
-    </div>
+      ) : sorted.length === 0 ? (
+        <div className="min-h-0 flex-1 border-t border-ic-border">
+          <Hint icon={<ActivityIcon size={26} />}>
+            No audited calls yet. Every agent tool call and every human decision will appear here.
+          </Hint>
+        </div>
+      ) : (
+        <DataTable count={sorted.length}>
+          <thead>
+            <tr className={theadRowClass}>
+              <Th className="w-[56px]">#</Th>
+              <Th className="w-[88px]">Time</Th>
+              <Th className="w-[180px]">Actor</Th>
+              <Th className="w-[210px]">Tool</Th>
+              <Th className="w-[112px]">Outcome</Th>
+              <Th>Detail</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((e) => (
+              <tr key={e.seq} className={dataRowClass}>
+                <td className={`${tdClass} ic-num text-ic-text-faint`}>{e.seq}</td>
+                <td className={`${tdClass} ic-num text-ic-text-faint`}>{e.at.slice(11, 19)}</td>
+                <td className={tdClass}>
+                  {/* Who did this is the most important column on this page, so
+                      it gets the icon and the colour rule the rest of the
+                      console already teaches: cool = machine, bone = human. */}
+                  <span className="flex items-center gap-1.5">
+                    {e.actor.kind === "agent" ? (
+                      <AgentIcon size={12} className="shrink-0 text-ic-accent" />
+                    ) : (
+                      <HumanIcon size={12} className="shrink-0 text-ic-text-dim" />
+                    )}
+                    <span className={e.actor.kind === "agent" ? "text-ic-accent" : "text-ic-text"}>{e.actor.kind}</span>
+                    <span className="truncate text-ic-text-faint">{e.actor.identity}</span>
+                  </span>
+                </td>
+                <td className={`${tdClass} text-ic-text`}>{e.tool}</td>
+                <td className={tdClass}>
+                  <span className={badge(outcomeTone(e.outcome))}>{e.outcome}</span>
+                </td>
+                <td
+                  className={`max-w-[380px] truncate ${tdClass} text-ic-text-faint`}
+                  title={e.denialReason ?? e.resultSummary}
+                >
+                  {e.denialReason ?? e.resultSummary}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </DataTable>
+      )}
+    </Page>
   );
 }
