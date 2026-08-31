@@ -5,13 +5,13 @@ import { statusColor } from "./statusColors.js";
 import { useGlowingCall } from "./toolActivity.js";
 
 const POS: Record<ServiceId, { x: number; y: number }> = {
-  frontend: { x: 110, y: 34 },
-  checkout: { x: 330, y: 34 },
-  payments: { x: 550, y: 34 },
-  auth: { x: 220, y: 150 },
-  notifications: { x: 440, y: 150 },
-  database: { x: 220, y: 260 },
-  queue: { x: 440, y: 260 },
+  frontend: { x: 110, y: 50 },
+  checkout: { x: 330, y: 50 },
+  payments: { x: 550, y: 50 },
+  auth: { x: 220, y: 162 },
+  notifications: { x: 440, y: 162 },
+  database: { x: 220, y: 274 },
+  queue: { x: 440, y: 274 },
 };
 
 const NODE_R = 30;
@@ -34,7 +34,13 @@ export function Topology({
   const depsDirection = (depsGlow?.record.args.direction as string | undefined) ?? "both";
 
   return (
-    <svg viewBox="0 0 640 300" width="100%" height="100%" role="img" aria-label="Service dependency topology">
+    <svg viewBox="0 0 640 340" width="100%" height="100%" role="img" aria-label="Service dependency topology">
+      <defs>
+        <radialGradient id="node-fill" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stopColor="#232a3c" />
+          <stop offset="100%" stopColor="#171b26" />
+        </radialGradient>
+      </defs>
       {edges.map(({ from, to }) => {
         const a = POS[from];
         const b = POS[to];
@@ -48,8 +54,11 @@ export function Topology({
             y1={a.y}
             x2={b.x}
             y2={b.y}
-            stroke={highlighted ? "var(--color-ic-accent)" : "var(--color-ic-border)"}
-            strokeWidth={highlighted ? 3 : 2}
+            stroke={highlighted ? "var(--color-ic-accent)" : "var(--color-ic-border-strong)"}
+            strokeWidth={highlighted ? 2.5 : 1.5}
+            strokeDasharray={highlighted ? "5 5" : undefined}
+            className={highlighted ? "animate-dash-flow" : ""}
+            style={{ transition: "stroke 250ms ease-out" }}
           />
         );
       })}
@@ -58,41 +67,67 @@ export function Topology({
         const h = health[id];
         const pulsing = id === healthService;
         const transitioning = transitioningServices.includes(id);
+        const color = statusColor(h?.status);
         return (
           <g key={id}>
             {pulsing && (
-              <circle cx={p.x} cy={p.y} r={NODE_R + 6} fill="none" stroke="var(--color-ic-accent)" strokeWidth={2} className={healthGlow?.pending ? "animate-ping" : ""} opacity={healthGlow?.pending ? 0.6 : 0.9} />
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={NODE_R}
+                fill="none"
+                stroke="var(--color-ic-accent)"
+                strokeWidth={2}
+                className={healthGlow?.pending ? "animate-radar" : ""}
+                opacity={healthGlow?.pending ? 1 : 0.9}
+                style={{ transformOrigin: `${p.x}px ${p.y}px` }}
+              />
             )}
             {transitioning && (
               <circle cx={p.x} cy={p.y} r={NODE_R + 6} fill="none" stroke="var(--color-ic-degraded)" strokeWidth={2} strokeDasharray="4 3" className="animate-spin" style={{ transformOrigin: `${p.x}px ${p.y}px` }} />
             )}
-            <circle cx={p.x} cy={p.y} r={NODE_R} fill="var(--color-ic-panel-2)" stroke={pulsing ? "var(--color-ic-accent)" : statusColor(h?.status)} strokeWidth={pulsing ? 4 : 3} />
-            <circle cx={p.x} cy={p.y} r={4} fill={statusColor(h?.status)} />
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r={NODE_R}
+              fill="url(#node-fill)"
+              stroke={pulsing ? "var(--color-ic-accent)" : color}
+              strokeWidth={pulsing ? 3.5 : 2.5}
+              style={{ filter: pulsing ? "drop-shadow(0 0 8px rgb(34 211 238 / 0.55))" : undefined, transition: "stroke 250ms ease-out" }}
+            />
             <text
               x={p.x}
-              y={p.y + NODE_R + 16}
+              y={p.y - 5}
               textAnchor="middle"
               fontFamily="var(--font-mono)"
               fontSize={12}
+              fontWeight={600}
+              fill={h ? color : "var(--color-ic-text-faint)"}
+            >
+              {h ? `${(h.errorRate * 100).toFixed(1)}%` : "—"}
+            </text>
+            <text x={p.x} y={p.y + 10} textAnchor="middle" fontFamily="var(--font-mono)" fontSize={9} fill="var(--color-ic-text-faint)">
+              {statusLabelShort(h?.status)}
+            </text>
+            <text
+              x={p.x}
+              y={p.y + NODE_R + 18}
+              textAnchor="middle"
+              fontFamily="var(--font-sans)"
+              fontSize={12}
+              fontWeight={500}
               fill="var(--color-ic-text)"
             >
               {SERVICES[id].displayName}
             </text>
-            {h && (
-              <text
-                x={p.x}
-                y={p.y + 4}
-                textAnchor="middle"
-                fontFamily="var(--font-mono)"
-                fontSize={10}
-                fill="var(--color-ic-text-dim)"
-              >
-                {(h.errorRate * 100).toFixed(1)}%
-              </text>
-            )}
           </g>
         );
       })}
     </svg>
   );
+}
+
+function statusLabelShort(status: ServiceHealthSummary["status"] | undefined): string {
+  if (!status) return "no data";
+  return status;
 }

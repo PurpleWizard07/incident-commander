@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { apiPost } from "../webmcp/apiClient.js";
+import { actionButton, fieldClass } from "./ui.js";
 
 const SERVICE_OPTIONS = ["frontend", "checkout", "payments", "auth", "database", "queue", "notifications"];
 
@@ -67,7 +68,7 @@ export function AddNoteForm({ incidentId, onSubmitted }: { incidentId: string; o
       onSubmit={handleSubmit}
       toolname="add_incident_note"
       tooldescription="Append a timestamped note to an incident timeline. Use to record findings, uncertainty, and any action that mitigates a symptom without fixing the underlying cause."
-      className={`rounded border p-2 transition-colors ${agentFilling ? "border-ic-accent" : "border-ic-border"}`}
+      className={`rounded-xl border p-2.5 transition-all duration-200 ${agentFilling ? "border-ic-accent shadow-glow-accent-soft" : "border-ic-border"}`}
     >
       <input type="hidden" name="incidentId" value={incidentId} />
       <textarea
@@ -77,13 +78,9 @@ export function AddNoteForm({ incidentId, onSubmitted }: { incidentId: string; o
         toolparamdescription="Plain text. State findings and uncertainty explicitly."
         placeholder="Add a note to this incident's timeline..."
         rows={2}
-        className="w-full resize-none rounded border border-ic-border bg-ic-panel-2 p-1.5 font-mono text-[11px] text-ic-text placeholder:text-ic-text-dim"
+        className={fieldClass("resize-none")}
       />
-      <button
-        type="submit"
-        disabled={busy}
-        className="mt-1 rounded bg-ic-panel-2 px-2 py-0.5 text-[11px] font-semibold text-ic-text disabled:opacity-50"
-      >
+      <button type="submit" disabled={busy} className={actionButton("secondary", "mt-1.5")}>
         {busy ? "…" : "Add note"}
       </button>
     </form>
@@ -122,7 +119,7 @@ export function CreateIncidentForm({ onSubmitted }: { onSubmitted: (incidentId: 
       onSubmit={handleSubmit}
       toolname="create_incident"
       tooldescription="Opens a new incident with a title, severity, and affected services, and returns its id. Use when you have identified a problem that is not already tracked."
-      className={`flex flex-col gap-1.5 rounded border p-2 transition-colors ${agentFilling ? "border-ic-accent" : "border-ic-border"}`}
+      className={`flex flex-col gap-2 rounded-xl border p-2.5 transition-all duration-200 ${agentFilling ? "border-ic-accent shadow-glow-accent-soft" : "border-ic-border"}`}
     >
       <input
         name="title"
@@ -130,7 +127,7 @@ export function CreateIncidentForm({ onSubmitted }: { onSubmitted: (incidentId: 
         aria-label="Incident title"
         toolparamdescription="Short incident title."
         placeholder="Incident title"
-        className="w-full rounded border border-ic-border bg-ic-panel-2 p-1.5 font-mono text-[11px] text-ic-text placeholder:text-ic-text-dim"
+        className={fieldClass()}
       />
       <div className="flex gap-1.5">
         <select
@@ -139,7 +136,7 @@ export function CreateIncidentForm({ onSubmitted }: { onSubmitted: (incidentId: 
           aria-label="Severity"
           toolparamdescription="SEV-1, SEV-2, or SEV-3."
           defaultValue=""
-          className="rounded border border-ic-border bg-ic-panel-2 p-1.5 font-mono text-[11px] text-ic-text"
+          className={fieldClass("w-auto")}
         >
           <option value="" disabled>
             severity
@@ -154,7 +151,7 @@ export function CreateIncidentForm({ onSubmitted }: { onSubmitted: (incidentId: 
           required
           aria-label="Affected services"
           toolparamdescription="One or more affected services."
-          className="flex-1 rounded border border-ic-border bg-ic-panel-2 p-1.5 font-mono text-[11px] text-ic-text"
+          className={fieldClass("flex-1")}
         >
           {SERVICE_OPTIONS.map((s) => (
             <option key={s} value={s}>
@@ -169,13 +166,9 @@ export function CreateIncidentForm({ onSubmitted }: { onSubmitted: (incidentId: 
         toolparamdescription="Optional free-text description, becomes the first note."
         placeholder="Description (optional)"
         rows={2}
-        className="w-full resize-none rounded border border-ic-border bg-ic-panel-2 p-1.5 font-mono text-[11px] text-ic-text placeholder:text-ic-text-dim"
+        className={fieldClass("resize-none")}
       />
-      <button
-        type="submit"
-        disabled={busy}
-        className="self-start rounded bg-ic-panel-2 px-2 py-0.5 text-[11px] font-semibold text-ic-text disabled:opacity-50"
-      >
+      <button type="submit" disabled={busy} className={actionButton("secondary", "self-start")}>
         {busy ? "…" : "Create incident"}
       </button>
     </form>

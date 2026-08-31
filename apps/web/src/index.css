@@ -1,18 +1,92 @@
 @import "tailwindcss";
 
 @theme {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
 
-  --color-ic-bg: #0b0e14;
-  --color-ic-panel: #11151d;
-  --color-ic-panel-2: #161b26;
-  --color-ic-border: #232a38;
-  --color-ic-text: #d7dce5;
-  --color-ic-text-dim: #7c8698;
-  --color-ic-healthy: #22c55e;
-  --color-ic-degraded: #eab308;
-  --color-ic-down: #ef4444;
-  --color-ic-accent: #38bdf8;
+  /* Surfaces — a near-black indigo ramp instead of flat slate, so panels read as
+     stacked depth rather than same-color boxes with a line between them. */
+  --color-ic-bg: #07080c;
+  --color-ic-bg-elevated: #0c0e15;
+  --color-ic-panel: #10131b;
+  --color-ic-panel-2: #171b26;
+  --color-ic-panel-3: #1e2330;
+  --color-ic-border: #212739;
+  --color-ic-border-strong: #313a52;
+
+  /* Text — three tiers instead of two, so hierarchy comes from more than font-weight. */
+  --color-ic-text: #eef1f8;
+  --color-ic-text-dim: #9aa1b3;
+  --color-ic-text-faint: #888b96;
+
+  /* Status — same semantics (healthy/degraded/down), warmer and less "bootstrap default." */
+  --color-ic-healthy: #34d399;
+  --color-ic-degraded: #fbbf24;
+  --color-ic-down: #fb7185;
+
+  /* Accent — a signature electric cyan, plus a violet companion for secondary emphasis
+     (formalizes what MetricsChart's series palette already reached for informally). */
+  --color-ic-accent: #22d3ee;
+  --color-ic-accent-2: #a78bfa;
+
+  --shadow-panel: 0 1px 1px 0 rgb(0 0 0 / 0.5), 0 16px 40px -20px rgb(0 0 0 / 0.75);
+  --shadow-panel-lg: 0 2px 4px 0 rgb(0 0 0 / 0.4), 0 24px 56px -20px rgb(0 0 0 / 0.8);
+  --shadow-glow-accent: 0 0 0 1px rgb(34 211 238 / 0.45), 0 0 28px -6px rgb(34 211 238 / 0.55);
+  --shadow-glow-accent-soft: 0 0 0 1px rgb(34 211 238 / 0.25), 0 0 16px -8px rgb(34 211 238 / 0.35);
+
+  --animate-fade-up: fade-up 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-in: fade-in 220ms ease-out both;
+  --animate-glow-pulse: glow-pulse 1.9s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-radar: radar-ping 1.7s cubic-bezier(0, 0, 0.2, 1) infinite;
+  --animate-dash-flow: dash-flow 1.1s linear infinite;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow: var(--shadow-glow-accent-soft);
+  }
+  50% {
+    box-shadow: var(--shadow-glow-accent);
+  }
+}
+
+@keyframes radar-ping {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.9;
+  }
+  75%,
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -16;
+  }
 }
 
 html,
@@ -23,11 +97,58 @@ body,
 
 body {
   background: var(--color-ic-bg);
+  background-image:
+    radial-gradient(ellipse 1200px 640px at 15% -10%, rgb(34 211 238 / 0.05), transparent 60%),
+    radial-gradient(ellipse 900px 520px at 100% 0%, rgb(167 139 250 / 0.04), transparent 55%);
   color: var(--color-ic-text);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1, "cv11" 1;
+  -webkit-font-smoothing: antialiased;
 }
 
 * {
   box-sizing: border-box;
+}
+
+.font-mono,
+[class*="font-mono"] {
+  font-feature-settings: "tnum" 1;
+}
+
+::selection {
+  background: rgb(34 211 238 / 0.28);
+  color: var(--color-ic-text);
+}
+
+/* Thin, low-contrast scrollbars that don't clash with a dark console. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ic-border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-ic-border-strong);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ic-text-faint);
+  background-clip: padding-box;
+}
+
+/* Consistent, visible focus ring for keyboard navigation — Tailwind's preflight
+   removes the UA default, so every interactive element needs this back. */
+:focus-visible {
+  outline: 2px solid var(--color-ic-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /*
@@ -39,5 +160,16 @@ body {
  */
 form:tool-form-active {
   border-color: var(--color-ic-accent) !important;
-  box-shadow: 0 0 0 1px var(--color-ic-accent);
+  box-shadow: var(--shadow-glow-accent) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

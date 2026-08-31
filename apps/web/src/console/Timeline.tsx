@@ -55,31 +55,35 @@ export function Timeline({ events, changes }: { events: TimelineEvent[]; changes
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 gap-1 border-b border-ic-border px-2 py-1.5 text-[11px]">
+      <div className="flex shrink-0 gap-1.5 border-b border-ic-border px-2.5 py-2 text-[11px]">
         {SOURCES.map((s) => (
           <button
             key={s}
             onClick={() => toggle(s)}
-            className="flex items-center gap-1 rounded px-2 py-0.5 capitalize"
-            style={{
-              background: filter.has(s) ? "var(--color-ic-panel-2)" : "transparent",
-              color: filter.has(s) ? "var(--color-ic-text)" : "var(--color-ic-text-dim)",
-            }}
+            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 capitalize transition-all duration-150 ease-out active:scale-95 ${
+              filter.has(s) ? "bg-ic-panel-2 text-ic-text" : "text-ic-text-faint hover:text-ic-text-dim"
+            }`}
           >
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: sourceColor(s) }} />
+            <span
+              className="h-1.5 w-1.5 rounded-full transition-shadow duration-150"
+              style={{ background: sourceColor(s), boxShadow: filter.has(s) ? `0 0 6px 0 ${sourceColor(s)}` : "none" }}
+            />
             {s}
           </button>
         ))}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {visible.length === 0 ? (
-          <div className="p-3 text-[11px] text-ic-text-dim">No timeline events yet.</div>
+          <div className="p-4 text-[11px] text-ic-text-faint">No timeline events yet.</div>
         ) : (
           visible.map((e, i) => (
-            <div key={i} className="flex h-6 items-center gap-2 border-b border-ic-border px-2 font-mono text-[11px]">
+            <div
+              key={i}
+              className="flex h-6 items-center gap-2 border-b border-ic-border px-2.5 font-mono text-[11px] transition-colors duration-150 hover:bg-ic-panel-2/40"
+            >
               <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: sourceColor(e.source) }} />
-              <span className="shrink-0 text-ic-text-dim">{e.at.slice(11, 16)}</span>
-              <span className="truncate">{e.summary}</span>
+              <span className="shrink-0 tabular-nums text-ic-text-faint">{e.at.slice(11, 16)}</span>
+              <span className="truncate text-ic-text-dim">{e.summary}</span>
             </div>
           ))
         )}

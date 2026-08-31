@@ -62,7 +62,7 @@ export function AppShell() {
               {section === "runbooks" && <RunbooksPage />}
               {section === "activity" && <ActivityPage />}
             </main>
-            <aside className="min-h-0 border-l border-ic-border">
+            <aside className="min-h-0 border-l border-ic-border bg-ic-bg-elevated">
               <AgentActivityRail
                 pendingApprovals={data.pendingApprovals}
                 toolSurfaceContext={{ incidentId, role: data.role, incidentState, hasPendingApproval }}

@@ -9,17 +9,18 @@ import { AddNoteForm, CreateIncidentForm } from "./DeclarativeForms.js";
 import { useGlowingCall } from "./toolActivity.js";
 import { computeConfidence, type ConfidenceLevel } from "./confidence.js";
 import type { ConsoleData } from "./useConsoleData.js";
+import { badge, type BadgeTone } from "./ui.js";
 
-function severityColor(severity: string): string {
-  if (severity === "SEV-1") return "var(--color-ic-down)";
-  if (severity === "SEV-2") return "var(--color-ic-degraded)";
-  return "var(--color-ic-text-dim)";
+function severityTone(severity: string): BadgeTone {
+  if (severity === "SEV-1") return "critical";
+  if (severity === "SEV-2") return "warning";
+  return "neutral";
 }
 
-function confidenceColor(level: ConfidenceLevel): string {
-  if (level === "Strong") return "var(--color-ic-healthy)";
-  if (level === "Moderate") return "var(--color-ic-degraded)";
-  return "var(--color-ic-text-dim)";
+function confidenceTone(level: ConfidenceLevel): BadgeTone {
+  if (level === "Strong") return "healthy";
+  if (level === "Moderate") return "warning";
+  return "neutral";
 }
 
 function IncidentHeader({ incident, glowing }: { incident: Incident; glowing: boolean }) {
@@ -27,45 +28,50 @@ function IncidentHeader({ incident, glowing }: { incident: Incident; glowing: bo
   const tooltip = `${confidence.supportingSignals} supporting signal(s) · ${confidence.alternativesFalsified} alternative(s) falsified · ${confidence.unexplainedObservations} unexplained observation(s)`;
   return (
     <div
-      className={`flex h-14 shrink-0 items-center gap-3 border-b px-3 transition-colors duration-300 ${
-        glowing ? "border-ic-accent bg-ic-panel-2" : "border-ic-border"
+      className={`flex h-14 shrink-0 items-center gap-3 border-b bg-ic-bg-elevated px-4 transition-colors duration-300 ${
+        glowing ? "border-ic-accent/60 shadow-[inset_0_-1px_0_0_var(--color-ic-accent)]" : "border-ic-border"
       }`}
     >
-      <span className="font-mono text-sm font-semibold text-ic-text">{incident.id}</span>
+      <span className="font-mono text-sm font-semibold tracking-tight text-ic-text">{incident.id}</span>
       <span className="text-sm text-ic-text-dim">{incident.title}</span>
-      <span
-        className="rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold text-ic-bg"
-        style={{ background: severityColor(incident.severity) }}
-      >
-        {incident.severity}
-      </span>
-      <span className="rounded bg-ic-panel-2 px-1.5 py-0.5 font-mono text-[11px] text-ic-text">
-        {incident.state}
-      </span>
-      <span
-        title={tooltip}
-        className="flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[11px]"
-        style={{ borderColor: confidenceColor(confidence.level), color: confidenceColor(confidence.level) }}
-      >
+      <span className={badge(severityTone(incident.severity))}>{incident.severity}</span>
+      <span className={badge("neutral")}>{incident.state}</span>
+      <span title={tooltip} className={badge(confidenceTone(confidence.level))}>
         confidence: {confidence.level}
       </span>
-      <span className="ml-auto font-mono text-[11px] text-ic-text-dim">opened {incident.openedAt.slice(11, 16)}</span>
+      <span className="ml-auto font-mono text-[11px] tabular-nums text-ic-text-faint">
+        opened {incident.openedAt.slice(11, 16)}
+      </span>
     </div>
   );
 }
 
 export function IncidentWorkspace({ data, refresh }: { data: ConsoleData; refresh: () => void }) {
   if (data.error) {
-    return <div className="p-4 text-sm text-ic-down">Failed to load console data: {data.error}</div>;
+    return (
+      <div className="flex h-full items-center justify-center p-4">
+        <div className="animate-fade-up rounded-xl border border-ic-down/30 bg-ic-down/[0.06] px-4 py-3 text-sm text-ic-down">
+          Failed to load console data: {data.error}
+        </div>
+      </div>
+    );
   }
 
   if (!data.incident) {
+    // Mirrors `Loaded`'s exact structure — header outside the padded scroll
+    // area, then TOPOLOGY/METRICS/EVIDENCE/TIMELINE/ACTIONS in that order at
+    // their real heights — so nothing shifts size or position when the real
+    // incident data replaces it (plan §21.2).
     return (
-      <div className="flex h-full flex-col gap-3 p-3">
+      <div className="flex h-full flex-col">
         <Skeleton className="h-14 shrink-0" />
-        <Skeleton className="h-64 shrink-0" />
-        <Skeleton className="h-72 shrink-0" />
-        <Skeleton className="h-80 shrink-0" />
+        <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-hidden p-3.5">
+          <Skeleton className="h-80 shrink-0" />
+          <Skeleton className="h-72 shrink-0" />
+          <Skeleton className="h-80 shrink-0" />
+          <Skeleton className="h-56 shrink-0" />
+          <Skeleton className="h-64 shrink-0" />
+        </div>
       </div>
     );
   }
@@ -89,8 +95,8 @@ function Loaded({ data, incident, refresh }: { data: ConsoleData; incident: Inci
   return (
     <div className="relative flex h-full flex-col">
       <IncidentHeader incident={incident} glowing={headerGlow !== null} />
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-        <Panel title="TOPOLOGY" className="h-72 shrink-0" glow={topologyGlow && (topologyGlow.pending ? "pending" : "settled")}>
+      <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto p-3.5">
+        <Panel title="TOPOLOGY" className="h-80 shrink-0" glow={topologyGlow && (topologyGlow.pending ? "pending" : "settled")}>
           {Object.keys(data.serviceHealth).length === 0 ? (
             <div className="flex h-full items-center justify-center">
               <Skeleton className="h-56 w-full" />
@@ -133,11 +139,11 @@ function Loaded({ data, incident, refresh }: { data: ConsoleData; incident: Inci
             these forms at all for that role, not just hiding them with CSS. */}
         <Panel title="ACTIONS" className="h-64 shrink-0">
           {data.role === "observer" ? (
-            <div className="flex h-full items-center justify-center p-3 text-center text-[11px] text-ic-text-dim">
+            <div className="flex h-full items-center justify-center p-3 text-center text-[11px] text-ic-text-faint">
               Observer role — no actions available.
             </div>
           ) : (
-            <div className="flex h-full flex-col gap-2 overflow-y-auto p-2">
+            <div className="flex h-full flex-col gap-2.5 overflow-y-auto p-2.5">
               <AddNoteForm incidentId={incident.id} onSubmitted={refresh} />
               <CreateIncidentForm onSubmitted={refresh} />
             </div>

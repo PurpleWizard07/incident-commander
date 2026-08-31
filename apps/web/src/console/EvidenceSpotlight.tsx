@@ -1,5 +1,6 @@
 import { useGlowingCall } from "./toolActivity.js";
 import { toolResultText } from "./toolResultText.js";
+import { SpinnerIcon } from "./icons.js";
 
 const SPOTLIGHT_HOLD_MS = 6000;
 
@@ -26,13 +27,13 @@ export function EvidenceSpotlight() {
   const text = active.pending ? "Looking this up…" : toolResultText(active.record.result) || active.record.error || "No result.";
 
   return (
-    <div className="pointer-events-none absolute right-3 top-3 z-10 w-80 max-w-[80%]">
-      <div className="pointer-events-auto rounded border border-ic-accent bg-ic-panel shadow-lg">
-        <div className="flex items-center gap-2 border-b border-ic-border px-3 py-1.5 text-xs font-semibold tracking-wide text-ic-accent">
-          {active.pending && <span className="animate-spin">⟳</span>}
+    <div key={active.record.id} className="pointer-events-none absolute right-4 top-[68px] z-10 w-96 max-w-[85%]">
+      <div className="animate-fade-up pointer-events-auto overflow-hidden rounded-xl border border-ic-accent bg-ic-panel shadow-panel-lg shadow-glow-accent-soft">
+        <div className="flex items-center gap-2 border-b border-ic-border bg-ic-accent/[0.08] px-3.5 py-2 text-[11px] font-semibold tracking-[0.08em] text-ic-accent">
+          {active.pending && <SpinnerIcon width={13} height={13} className="animate-spin" />}
           {label}
         </div>
-        <div className="max-h-48 overflow-y-auto whitespace-pre-wrap px-3 py-2 font-mono text-[11px] text-ic-text">
+        <div className="max-h-72 overflow-y-auto whitespace-pre-wrap px-3.5 py-2.5 font-mono text-[11px] leading-relaxed text-ic-text">
           {text}
         </div>
       </div>

@@ -2,11 +2,12 @@ import { useState } from "react";
 import type { Approval } from "@incident-commander/shared";
 import { issueApprovalNonce, decideApproval } from "./api.js";
 import { useEvidenceJump } from "./evidenceJump.js";
+import { actionButton, badge, type BadgeTone } from "./ui.js";
 
-function riskColor(risk: string): string {
-  if (risk === "high") return "var(--color-ic-down)";
-  if (risk === "medium") return "var(--color-ic-degraded)";
-  return "var(--color-ic-healthy)";
+function riskTone(risk: string): BadgeTone {
+  if (risk === "high") return "critical";
+  if (risk === "medium") return "warning";
+  return "healthy";
 }
 
 /**
@@ -37,66 +38,57 @@ export function ApprovalCard({ approval }: { approval: Approval }) {
   }
 
   return (
-    <div className="flex flex-col gap-2 p-3 text-[11px]">
+    <div className="flex flex-col gap-2.5 p-3.5 text-[11px]">
       <div className="flex items-center justify-between">
-        <span className="font-semibold tracking-wide text-ic-text">PROPOSED ACTION</span>
-        <span className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold text-ic-bg" style={{ background: riskColor(approval.risk) }}>
-          risk: {approval.risk.toUpperCase()}
-        </span>
+        <span className="text-[11px] font-semibold tracking-[0.08em] text-ic-text">PROPOSED ACTION</span>
+        <span className={badge(riskTone(approval.risk))}>risk: {approval.risk}</span>
       </div>
 
-      <div className="font-mono text-ic-text">
-        {approval.action.tool}({Object.entries(approval.action.args).map(([k, v]) => `${k}=${String(v)}`).join(", ")})
+      <div className="rounded-lg border border-ic-border bg-ic-panel-2 px-2.5 py-1.5 font-mono text-ic-accent-2">
+        {approval.action.tool}
+        <span className="text-ic-text-dim">({Object.entries(approval.action.args).map(([k, v]) => `${k}=${String(v)}`).join(", ")})</span>
       </div>
 
       <div>
-        <div className="text-ic-text-dim">Reason</div>
+        <div className="text-ic-text-faint">Reason</div>
         <div className="text-ic-text">{approval.reason}</div>
       </div>
 
       {approval.evidenceRefs.length > 0 && (
         <div>
-          <div className="text-ic-text-dim">Evidence</div>
-          {approval.evidenceRefs.map((ref, i) => (
-            <button
-              key={i}
-              data-testid={`evidence-link-${ref.kind}`}
-              onClick={() => requestJump(ref)}
-              className="block text-left text-ic-accent underline decoration-dotted"
-            >
-              → {ref.label}
-            </button>
-          ))}
+          <div className="text-ic-text-faint">Evidence</div>
+          <div className="mt-0.5 flex flex-col gap-0.5">
+            {approval.evidenceRefs.map((ref, i) => (
+              <button
+                key={i}
+                data-testid={`evidence-link-${ref.kind}`}
+                onClick={() => requestJump(ref)}
+                className="block w-fit text-left text-ic-accent decoration-ic-accent/40 decoration-dotted transition-colors duration-150 hover:text-ic-accent-2 hover:underline"
+              >
+                → {ref.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
       <div>
-        <div className="text-ic-text-dim">Expected effect</div>
+        <div className="text-ic-text-faint">Expected effect</div>
         <div className="text-ic-text">{approval.expectedEffect}</div>
       </div>
 
       <div>
-        <div className="text-ic-text-dim">Not covered</div>
+        <div className="text-ic-text-faint">Not covered</div>
         <div className="text-ic-text">{approval.notCovered}</div>
       </div>
 
-      {error && <div className="text-ic-down">{error}</div>}
+      {error && <div className="rounded-lg bg-ic-down/10 px-2 py-1 text-ic-down">{error}</div>}
 
       <div className="mt-1 flex gap-2">
-        <button
-          data-testid="approval-reject"
-          onClick={() => decide("rejected")}
-          disabled={busy !== null}
-          className="flex-1 rounded bg-ic-panel-2 py-1 font-semibold text-ic-text disabled:opacity-50"
-        >
+        <button data-testid="approval-reject" onClick={() => decide("rejected")} disabled={busy !== null} className={actionButton("secondary", "flex-1")}>
           {busy === "reject" ? "…" : "Reject"}
         </button>
-        <button
-          data-testid="approval-approve"
-          onClick={() => decide("approved")}
-          disabled={busy !== null}
-          className="flex-1 rounded bg-ic-accent py-1 font-semibold text-ic-bg disabled:opacity-50"
-        >
+        <button data-testid="approval-approve" onClick={() => decide("approved")} disabled={busy !== null} className={actionButton("primary", "flex-1")}>
           {busy === "approve" ? "…" : "Approve"}
         </button>
       </div>

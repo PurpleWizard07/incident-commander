@@ -13,6 +13,7 @@ import type { Deployment, MetricName, ServiceId } from "@incident-commander/shar
 import { SERVICES } from "@incident-commander/shared";
 import { compareMetrics as fetchCompareMetrics, type RawMetricSeries } from "./api.js";
 import { useGlowingCall } from "./toolActivity.js";
+import { pillToggle } from "./ui.js";
 
 interface OnsetMarker {
   minute: number;
@@ -20,7 +21,7 @@ interface OnsetMarker {
   label: string;
 }
 
-const SERIES_COLORS = ["#38bdf8", "#f97316", "#a78bfa", "#f472b6", "#4ade80", "#facc15", "#f87171"];
+const SERIES_COLORS = ["#22d3ee", "#fb923c", "#a78bfa", "#f472b6", "#34d399", "#fbbf24", "#fb7185"];
 
 type Row = { minute: number } & Partial<Record<ServiceId, number>>;
 
@@ -88,35 +89,55 @@ export function MetricsChart({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 gap-1 px-2 pt-2">
-        {metrics.map((m) => (
-          <button
-            key={m}
-            onClick={() => setMetric(m)}
-            className={`rounded px-2 py-0.5 text-[11px] ${
-              m === active ? "bg-ic-accent text-ic-bg" : "bg-ic-panel-2 text-ic-text-dim"
-            }`}
-          >
-            {m}
-          </button>
-        ))}
+      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 px-2.5 pt-2.5">
+        <div className="flex gap-1.5">
+          {metrics.map((m) => (
+            <button key={m} onClick={() => setMetric(m)} className={pillToggle(m === active)}>
+              {m}
+            </button>
+          ))}
+        </div>
+        {services.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 font-mono text-[10px] text-ic-text-dim">
+            {services.map((service, i) => {
+              const dimmed = emphasizing && !compareServices!.includes(service);
+              return (
+                <span key={service} className="flex items-center gap-1" style={{ opacity: dimmed ? 0.4 : 1 }}>
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: SERIES_COLORS[i % SERIES_COLORS.length] }} />
+                  {SERVICES[service].displayName}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
       <div className="min-h-0 flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={rows} margin={{ top: 12, right: 12, left: 0, bottom: 4 }}>
-            <CartesianGrid stroke="var(--color-ic-border)" strokeDasharray="3 3" />
+            <CartesianGrid stroke="var(--color-ic-border)" strokeDasharray="3 3" strokeOpacity={0.6} />
             <XAxis
               dataKey="minute"
-              tick={{ fontSize: 10, fill: "var(--color-ic-text-dim)" }}
-              label={{ value: "minute", position: "insideBottomRight", offset: -2, fontSize: 10, fill: "var(--color-ic-text-dim)" }}
+              tick={{ fontSize: 10, fill: "var(--color-ic-text-faint)" }}
+              tickLine={{ stroke: "var(--color-ic-border)" }}
+              axisLine={{ stroke: "var(--color-ic-border)" }}
+              label={{ value: "minute", position: "insideBottomRight", offset: -2, fontSize: 10, fill: "var(--color-ic-text-faint)" }}
             />
             <YAxis
-              tick={{ fontSize: 10, fill: "var(--color-ic-text-dim)" }}
+              tick={{ fontSize: 10, fill: "var(--color-ic-text-faint)" }}
+              tickLine={{ stroke: "var(--color-ic-border)" }}
+              axisLine={{ stroke: "var(--color-ic-border)" }}
               width={40}
-              label={{ value: unit, angle: -90, position: "insideLeft", fontSize: 10, fill: "var(--color-ic-text-dim)" }}
+              label={{ value: unit, angle: -90, position: "insideLeft", fontSize: 10, fill: "var(--color-ic-text-faint)" }}
             />
             <Tooltip
-              contentStyle={{ background: "var(--color-ic-panel)", border: "1px solid var(--color-ic-border)", fontSize: 11 }}
+              contentStyle={{
+                background: "var(--color-ic-panel-2)",
+                border: "1px solid var(--color-ic-border-strong)",
+                borderRadius: 10,
+                fontSize: 11,
+                boxShadow: "0 16px 40px -16px rgb(0 0 0 / 0.7)",
+              }}
+              labelStyle={{ color: "var(--color-ic-text-dim)" }}
             />
             {filtered.map((s, i) => (
               <ReferenceLine

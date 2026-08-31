@@ -3,6 +3,7 @@ import { List, useListRef, type RowComponentProps } from "react-window";
 import type { LogEntry, Trace, Deployment, Change, EvidenceRef } from "@incident-commander/shared";
 import { useGlowingCall, type GlowingCall } from "./toolActivity.js";
 import { useEvidenceJump } from "./evidenceJump.js";
+import { pillToggle, scrollBehavior } from "./ui.js";
 
 type Tab = "logs" | "traces" | "deployments" | "changes";
 
@@ -40,17 +41,17 @@ function LogRow({ index, style, ariaAttributes, logs, highlightQuery }: RowCompo
     <div
       style={style}
       {...ariaAttributes}
-      className={`flex items-center gap-2 truncate border-l-2 px-2 font-mono text-[11px] ${
-        matched ? "border-ic-accent bg-ic-panel-2" : "border-transparent"
+      className={`flex items-center gap-2 truncate border-l-2 px-2 font-mono text-[11px] transition-colors duration-200 ${
+        matched ? "border-ic-accent bg-ic-accent/[0.06]" : "border-transparent hover:bg-ic-panel-2/60"
       }`}
       title={l.message}
     >
-      <span className="shrink-0 text-ic-text-dim">{l.timestamp.slice(11, 19)}</span>
+      <span className="shrink-0 tabular-nums text-ic-text-faint">{l.timestamp.slice(11, 19)}</span>
       <span className="w-14 shrink-0 font-semibold" style={{ color: levelColor(l.level) }}>
         {l.level}
       </span>
       <span className="w-24 shrink-0 text-ic-text-dim">{l.service}</span>
-      <span className="truncate">{l.message}</span>
+      <span className="truncate text-ic-text">{l.message}</span>
     </div>
   );
 }
@@ -71,30 +72,36 @@ function TraceRow({ trace, highlightQuery, jumped }: { trace: Trace; highlightQu
   return (
     <div
       id={`evidence-trace-${trace.traceId}`}
-      className={`border-b border-l-2 border-ic-border px-2 py-1.5 ${matched ? "border-l-ic-accent bg-ic-panel-2" : "border-l-transparent"}`}
+      className={`border-b border-l-2 border-ic-border px-2 py-2 transition-colors duration-200 ${matched ? "border-l-ic-accent bg-ic-accent/[0.06]" : "border-l-transparent hover:bg-ic-panel-2/40"}`}
     >
       <div className="flex items-center justify-between font-mono text-[11px] text-ic-text-dim">
         <span>
-          {trace.traceId} · {trace.rootService} · {trace.durationMs}ms
+          {trace.traceId} · {trace.rootService} · <span className="tabular-nums">{trace.durationMs}ms</span>
         </span>
-        <span style={{ color: trace.status === "error" ? "var(--color-ic-down)" : "var(--color-ic-healthy)" }}>
+        <span
+          className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+          style={{
+            color: trace.status === "error" ? "var(--color-ic-down)" : "var(--color-ic-healthy)",
+            background: trace.status === "error" ? "rgb(251 113 133 / 0.12)" : "rgb(52 211 153 / 0.12)",
+          }}
+        >
           {trace.status}
         </span>
       </div>
-      <div className="relative mt-1 h-full">
+      <div className="relative mt-1.5 h-full">
         {trace.spans.map((span) => {
           const left = (span.startOffsetMs / trace.durationMs) * 100;
           const width = Math.max(1, (span.durationMs / trace.durationMs) * 100);
           const failing = span.spanId === trace.failingSpanId;
           return (
-            <div key={span.spanId} className="flex h-4 items-center gap-1 text-[10px]">
-              <div className="relative h-2 flex-1 rounded bg-ic-panel-2">
+            <div key={span.spanId} className="flex h-4 items-center gap-1.5 text-[10px]">
+              <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-ic-panel-2">
                 <div
-                  className="absolute top-0 h-2 rounded"
+                  className="absolute inset-y-0 left-0 h-1.5 w-full origin-left rounded-full transition-transform duration-200"
                   style={{
-                    left: `${left}%`,
-                    width: `${width}%`,
+                    transform: `translateX(${left}%) scaleX(${width / 100})`,
                     background: failing ? "var(--color-ic-down)" : span.status === "error" ? "var(--color-ic-degraded)" : "var(--color-ic-accent)",
+                    boxShadow: failing ? "0 0 6px 0 rgb(251 113 133 / 0.7)" : undefined,
                   }}
                 />
               </div>
@@ -178,7 +185,7 @@ export function EvidenceTabs({
     if (target) setTab(target);
     if (jump.ref.kind === "trace" || jump.ref.kind === "deployment" || jump.ref.kind === "change") {
       const prefix = jump.ref.kind === "trace" ? "evidence-trace-" : jump.ref.kind === "deployment" ? "evidence-deployment-" : "evidence-change-";
-      setTimeout(() => document.getElementById(`${prefix}${jump.ref.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+      setTimeout(() => document.getElementById(`${prefix}${jump.ref.id}`)?.scrollIntoView({ behavior: scrollBehavior(), block: "center" }), 50);
     }
   }, [jump]);
   const jumpedTraceId = jump?.ref.kind === "trace" ? jump.ref.id : null;
@@ -194,20 +201,14 @@ export function EvidenceTabs({
     const index = logs.findIndex((l) => matchesLogQuery(l, logQuery));
     if (index === -1) return;
     scrolledForCallId.current = logsGlow.record.id;
-    listRef.current?.scrollToRow({ index, align: "center", behavior: "smooth" });
+    listRef.current?.scrollToRow({ index, align: "center", behavior: scrollBehavior() });
   }, [logQuery, logsGlow, logs, listRef]);
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 gap-1 border-b border-ic-border px-2 py-1.5 text-[11px]">
+      <div className="flex shrink-0 gap-1.5 border-b border-ic-border px-2 py-2 text-[11px]">
         {(["logs", "traces", "deployments", "changes"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`rounded px-2 py-0.5 capitalize ${
-              tab === t ? "bg-ic-accent text-ic-bg" : "bg-ic-panel-2 text-ic-text-dim"
-            }`}
-          >
+          <button key={t} onClick={() => setTab(t)} className={pillToggle(tab === t, "capitalize")}>
             {t}
           </button>
         ))}
@@ -246,13 +247,13 @@ export function EvidenceTabs({
                     <tr
                       key={d.id}
                       id={`evidence-deployment-${d.id}`}
-                      className={`border-b border-l-2 border-ic-border ${matched ? "border-l-ic-accent bg-ic-panel-2" : "border-l-transparent"}`}
+                      className={`border-b border-l-2 border-ic-border transition-colors duration-200 ${matched ? "border-l-ic-accent bg-ic-accent/[0.06]" : "border-l-transparent hover:bg-ic-panel-2/40"}`}
                     >
-                      <td className="px-2 py-1 text-ic-text-dim">{d.deployedAt.slice(0, 16).replace("T", " ")}</td>
-                      <td className="px-2 py-1">{d.service}</td>
-                      <td className="px-2 py-1">{d.version}</td>
-                      <td className="px-2 py-1 text-ic-text-dim">{d.riskScore}</td>
-                      <td className="max-w-[240px] truncate px-2 py-1 text-ic-text-dim" title={d.commitMessage}>
+                      <td className="px-2 py-1.5 text-ic-text-dim">{d.deployedAt.slice(0, 16).replace("T", " ")}</td>
+                      <td className="px-2 py-1.5 text-ic-text">{d.service}</td>
+                      <td className="px-2 py-1.5 text-ic-accent-2">{d.version}</td>
+                      <td className="px-2 py-1.5 text-ic-text-dim">{d.riskScore}</td>
+                      <td className="max-w-[240px] truncate px-2 py-1.5 text-ic-text-dim" title={d.commitMessage}>
                         {d.commitMessage}
                       </td>
                     </tr>
@@ -272,12 +273,12 @@ export function EvidenceTabs({
                     <tr
                       key={c.id}
                       id={`evidence-change-${c.id}`}
-                      className={`border-b border-l-2 border-ic-border ${matched ? "border-l-ic-accent bg-ic-panel-2" : "border-l-transparent"}`}
+                      className={`border-b border-l-2 border-ic-border transition-colors duration-200 ${matched ? "border-l-ic-accent bg-ic-accent/[0.06]" : "border-l-transparent hover:bg-ic-panel-2/40"}`}
                     >
-                      <td className="px-2 py-1 text-ic-text-dim">{c.at.slice(0, 16).replace("T", " ")}</td>
-                      <td className="px-2 py-1">{c.type}</td>
-                      <td className="px-2 py-1">{c.service ?? "—"}</td>
-                      <td className="max-w-[280px] truncate px-2 py-1 text-ic-text-dim" title={c.summary}>
+                      <td className="px-2 py-1.5 text-ic-text-dim">{c.at.slice(0, 16).replace("T", " ")}</td>
+                      <td className="px-2 py-1.5 text-ic-text">{c.type}</td>
+                      <td className="px-2 py-1.5 text-ic-text-dim">{c.service ?? "—"}</td>
+                      <td className="max-w-[280px] truncate px-2 py-1.5 text-ic-text-dim" title={c.summary}>
                         {c.summary}
                       </td>
                     </tr>
@@ -293,5 +294,5 @@ export function EvidenceTabs({
 }
 
 function EmptyNote({ text }: { text: string }) {
-  return <div className="p-3 text-[11px] text-ic-text-dim">{text}</div>;
+  return <div className="p-4 text-[11px] text-ic-text-faint">{text}</div>;
 }
