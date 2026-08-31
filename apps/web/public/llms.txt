@@ -1,0 +1,36 @@
+# Incident Commander
+
+> A WebMCP-native production incident-response console. An AI agent investigates a live incident
+> through structured, imperative and declarative WebMCP tools — service health, deployments, logs,
+> traces, metrics, runbooks — while a human responder watches the same evidence in the same console.
+> Production-changing actions (rollback, restart, scale, disabling a feature flag) require human
+> approval, enforced server-side; record-changing actions (notes, opening a new incident) use
+> declarative WebMCP forms so a human reads what the agent wrote before it lands. This is a
+> deterministic simulation: no real infrastructure is reachable, and no action here has any effect
+> outside this site.
+
+## Tool surface
+
+- 21 imperative tools registered via `document.modelContext.registerTool()`: 12 read-only
+  investigation tools, 6 gated/state-gated action tools, and 3 human-control tools governing
+  approvals.
+- 2 declarative tools (`create_incident`, `add_incident_note`) exposed as `<form toolname="...">`
+  elements — the agent fills the form, a human still presses Submit.
+- The registered tool surface changes live with the selected incident, the console's role
+  (`responder`/`approver`/`observer`), the incident's state, and whether an approval is pending.
+  `observer` registers no action or approval tools at all.
+
+## Scenarios
+
+Five deterministic incidents, selectable via `?scenario=` and reseeded via `?seed=` in the URL:
+INC-4821 (bad deploy), INC-4822 (connection-pool exhaustion behind a decoy deploy), INC-4823
+(runaway feature flag), INC-4824 (memory leak, no single failing span), and INC-4825 (third-party
+provider outage — the correct response is to escalate, not remediate).
+
+## Docs
+
+- [README](/README.md): setup, both judge-browser test paths, scenario/seed parameters.
+- [docs/ARCHITECTURE.md](/docs/ARCHITECTURE.md): system design.
+- [docs/WEBMCP.md](/docs/WEBMCP.md): how the tool surface is built and why.
+- [docs/SECURITY.md](/docs/SECURITY.md): the authorization model, including the seeded
+  prompt-injection line in INC-4822's logs and why it changes nothing.

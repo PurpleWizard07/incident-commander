@@ -73,6 +73,7 @@ export function AddNoteForm({ incidentId, onSubmitted }: { incidentId: string; o
       <textarea
         name="note"
         required
+        aria-label="Note"
         toolparamdescription="Plain text. State findings and uncertainty explicitly."
         placeholder="Add a note to this incident's timeline..."
         rows={2}
@@ -126,6 +127,7 @@ export function CreateIncidentForm({ onSubmitted }: { onSubmitted: (incidentId: 
       <input
         name="title"
         required
+        aria-label="Incident title"
         toolparamdescription="Short incident title."
         placeholder="Incident title"
         className="w-full rounded border border-ic-border bg-ic-panel-2 p-1.5 font-mono text-[11px] text-ic-text placeholder:text-ic-text-dim"
@@ -134,6 +136,7 @@ export function CreateIncidentForm({ onSubmitted }: { onSubmitted: (incidentId: 
         <select
           name="severity"
           required
+          aria-label="Severity"
           toolparamdescription="SEV-1, SEV-2, or SEV-3."
           defaultValue=""
           className="rounded border border-ic-border bg-ic-panel-2 p-1.5 font-mono text-[11px] text-ic-text"
@@ -149,6 +152,7 @@ export function CreateIncidentForm({ onSubmitted }: { onSubmitted: (incidentId: 
           name="affectedServices"
           multiple
           required
+          aria-label="Affected services"
           toolparamdescription="One or more affected services."
           className="flex-1 rounded border border-ic-border bg-ic-panel-2 p-1.5 font-mono text-[11px] text-ic-text"
         >
@@ -161,6 +165,7 @@ export function CreateIncidentForm({ onSubmitted }: { onSubmitted: (incidentId: 
       </div>
       <textarea
         name="description"
+        aria-label="Description"
         toolparamdescription="Optional free-text description, becomes the first note."
         placeholder="Description (optional)"
         rows={2}
