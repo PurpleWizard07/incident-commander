@@ -2,8 +2,8 @@ import type { Approval } from "@incident-commander/shared";
 import { useToolRecords } from "./toolActivity.js";
 import { toolResultText } from "./toolResultText.js";
 import { ApprovalCard } from "./ApprovalCard.js";
-import { describeToolSurface, type ToolCallRecord, type ToolSurfaceContext } from "../webmcp/registerTools.js";
-import { AgentIcon, AuthorityIcon, CheckIcon, CrossIcon, SpinnerIcon } from "./icons.js";
+import { describeToolSurface, hasAgentInterface, type ToolCallRecord, type ToolSurfaceContext } from "../webmcp/registerTools.js";
+import { AgentIcon, ArrowRightIcon, AuthorityIcon, CheckIcon, CrossIcon, SpinnerIcon } from "./icons.js";
 
 /**
  * ═══ The agent lane ═══
@@ -124,17 +124,40 @@ function SurfaceMeter({ context }: { context: ToolSurfaceContext }) {
 }
 
 /**
- * The lane's empty state is the first thing anyone opening this console sees,
- * and it stays on screen until an agent connects — which, for someone evaluating
- * the project, may be the whole first minute. It was 900px of void with one
- * centred sentence in it.
+ * ═══ The lane's empty state ═══
  *
- * It now does the job that space should do: says what the surface is, shows the
- * literal sentence that will make the console come alive, and states what will
- * happen when it does. Same voice and same grammar as the rest of the interface
- * — an overline, a rule, mono body — so it reads as part of the instrument
- * rather than as onboarding bolted on.
+ * This is on screen for a judge's whole first minute, and it used to spend that
+ * minute talking to the wrong reader. Two of its four blocks were addressed to
+ * an evaluator rather than an operator: a count of registered tools with the API
+ * name (`document.modelContext`) — an engineering brag no responder cares about
+ * — and a standing instruction to reopen the page in a different browser behind
+ * a Chrome flag. A real incident console does not tell the person on call to
+ * switch browsers, and both facts already live in the README, which is where
+ * someone evaluating the project reads them.
+ *
+ * What stays is ordinary product copy: what the assistance in this console is,
+ * the one sentence that invokes it, and what will visibly happen when it runs.
+ *
+ * The setup instructions did solve a real problem — a page opened in a browser
+ * with no agent interface leaves a lane that never fills, which reads as broken
+ * — so they are still here, but only where they are actionable: shown when
+ * `document.modelContext` is genuinely absent, never to a session that already
+ * has an agent attached. Detect, then speak.
  */
+function NoAgentNotice() {
+  return (
+    <div className="rounded-md border border-ic-degraded/25 bg-ic-degraded/[0.06] px-3 py-2.5">
+      <div className="ic-overline mb-1 text-ic-degraded">No agent connected</div>
+      <p className="text-[11px] leading-[1.5] text-ic-text-dim">
+        This browser has no agent interface, so nothing can drive the console but you. To watch an
+        agent work here, open it in ChatGPT&apos;s in-app browser, or in Chrome with{" "}
+        <span className="font-mono text-[10px] text-ic-text-faint">chrome://flags/#enable-webmcp-testing</span>{" "}
+        enabled.
+      </p>
+    </div>
+  );
+}
+
 function StandingBy() {
   return (
     <div className="flex h-full flex-col justify-center gap-5 px-5 py-6">
@@ -142,10 +165,10 @@ function StandingBy() {
         <span className="relative flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-inset ring-ic-border">
           <AgentIcon size={19} className="text-ic-border-strong" />
         </span>
-        <p className="font-mono text-[10.5px] leading-relaxed text-ic-text-faint">
-          No tool calls yet. This page publishes{" "}
-          <span className="text-ic-text-dim">23 WebMCP tools</span> on{" "}
-          <span className="text-ic-text-dim">document.modelContext</span>.
+        <p className="text-[12px] leading-[1.5] text-ic-text-dim">
+          No tool calls yet. An agent investigating this incident works{" "}
+          <span className="text-ic-text">here, in your console</span> — not in a chat window
+          somewhere else.
         </p>
       </div>
 
@@ -166,20 +189,103 @@ function StandingBy() {
         matched, the deploy it correlated against.
       </p>
 
-      <p className="font-mono text-[9.5px] leading-[1.6] text-ic-text-faint">
-        Open this URL in ChatGPT&apos;s in-app browser, or in Chrome with{" "}
-        <span className="text-ic-text-faint">chrome://flags/#enable-webmcp-testing</span> enabled.
-      </p>
+      {!hasAgentInterface() && <NoAgentNotice />}
     </div>
+  );
+}
+
+/**
+ * ═══ The collapsed rail ═══
+ *
+ * The lane held a permanent 352px grid column, sized for its rare peak (an
+ * approval card) rather than its normal state (empty, or a short list of mono
+ * lines). On a 1440px laptop that left the workspace 1024px and the topology
+ * graph about 465px — and the topology graph is this console's signature
+ * visual. The grid now reserves 44px and the lane slides out *over* the sheet.
+ *
+ * What stays behind is this rail, and it has the one job the lane cannot
+ * delegate: never let the agent, or a production change waiting on a human, be
+ * invisible. It carries the working state (the icon goes cool blue and pings),
+ * the call count, and a pending-approval marker in the amber this console
+ * reserves for "a person is the blocker".
+ *
+ * Rendered only while the lane is collapsed. The drawer covers this column
+ * when it is open, and a focusable button underneath an overlay is a real
+ * accessibility problem with no good escape — `aria-hidden` on something
+ * tabbable is itself a violation, and leaving it reachable gives a keyboard
+ * user a control that reports "expanded" and then does nothing. So the lane's
+ * own collapse button is the only control while it is open.
+ */
+export function AgentRail({ pendingCount, onOpen }: { pendingCount: number; onOpen: () => void }) {
+  const records = useToolRecords();
+  const working = records.some((r) => r.settledAt === null);
+  const label = [
+    "Agent lane",
+    records.length === 0 ? "standing by" : `${records.length} call${records.length === 1 ? "" : "s"}`,
+    pendingCount > 0 ? `${pendingCount} awaiting your decision` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  return (
+    <button
+      onClick={onOpen}
+      aria-expanded={false}
+      aria-label={label}
+      title={label}
+      className="group relative flex h-full w-11 flex-col items-center gap-3 border-l border-ic-border bg-ic-bg/35 pb-4 pt-3.5 transition-colors duration-150 hover:bg-ic-panel/60"
+    >
+      {/* The rail's own edge lights while a call is in flight, so the agent
+          stays visible from across a room even with the lane put away. */}
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-y-0 left-0 w-px transition-colors duration-300 ${
+          working ? "bg-ic-accent" : "bg-transparent"
+        }`}
+      />
+
+      <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
+        {working && (
+          <span aria-hidden="true" className="animate-radar absolute h-6 w-6 rounded-full bg-ic-accent/20" />
+        )}
+        <AgentIcon
+          size={15}
+          className={`relative transition-colors duration-300 ${
+            working ? "text-ic-accent" : "text-ic-text-faint group-hover:text-ic-text-dim"
+          }`}
+        />
+      </span>
+
+      {pendingCount > 0 && (
+        <span className="flex h-[19px] min-w-[19px] shrink-0 items-center justify-center rounded-full bg-ic-degraded/15 px-1 ring-1 ring-inset ring-ic-degraded/40">
+          <AuthorityIcon size={11} className="text-ic-degraded" />
+        </span>
+      )}
+
+      <span
+        className="ic-overline select-none text-[8.5px] tracking-[0.28em]"
+        style={{ writingMode: "vertical-rl" }}
+      >
+        Agent
+      </span>
+
+      {records.length > 0 && (
+        <span className={`ic-num shrink-0 text-[10.5px] ${working ? "text-ic-accent" : "text-ic-text-faint"}`}>
+          {records.length}
+        </span>
+      )}
+    </button>
   );
 }
 
 export function AgentLane({
   pendingApprovals,
   toolSurfaceContext,
+  onCollapse,
 }: {
   pendingApprovals: Approval[];
   toolSurfaceContext: ToolSurfaceContext;
+  onCollapse: () => void;
 }) {
   const records = useToolRecords();
   const working = records.some((r) => r.settledAt === null);
@@ -193,6 +299,14 @@ export function AgentLane({
           <span className="ml-auto font-mono text-[10px] text-ic-text-faint">
             {records.length === 0 ? "standing by" : `${records.length} call${records.length === 1 ? "" : "s"}`}
           </span>
+          <button
+            onClick={onCollapse}
+            aria-label="Collapse agent lane"
+            title="Collapse agent lane"
+            className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ic-text-faint transition-colors duration-150 hover:bg-ic-panel-2 hover:text-ic-text"
+          >
+            <ArrowRightIcon size={14} />
+          </button>
         </div>
         {/* A light travelling the head's bottom hairline while a call is open. */}
         {working && (

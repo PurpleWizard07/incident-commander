@@ -155,6 +155,18 @@ export function describeToolSurface(ctx: ToolSurfaceContext): { read: number; ac
 }
 
 /**
+ * Whether this browser exposes the agent interface at all.
+ *
+ * The console is a human product first, so it must not tell every operator to
+ * go and enable a Chrome flag. But a page that can never receive a tool call
+ * should say so once, plainly, instead of leaving a lane that silently never
+ * fills. Detect, then speak — see `AgentLane`'s `StandingBy`.
+ */
+export function hasAgentInterface(): boolean {
+  return typeof document !== "undefined" && !!document.modelContext;
+}
+
+/**
  * Registers whichever tools `selectRegisteredTools` says belong to the
  * current context, via document.modelContext.registerTool(). Callers
  * (AppShell) create one AbortController-backed "generation" per distinct
@@ -166,7 +178,11 @@ export function describeToolSurface(ctx: ToolSurfaceContext): { read: number; ac
  * boundary").
  */
 export function registerDynamicTools(ctx: ToolSurfaceContext): () => void {
-  if (typeof document === "undefined" || !document.modelContext) {
+  // Held in a local so it stays narrowed across the loop below — a boolean
+  // helper like `hasAgentInterface()` cannot narrow `document.modelContext`
+  // for the compiler, and re-reading the property per tool would not either.
+  const modelContext = typeof document === "undefined" ? undefined : document.modelContext;
+  if (!modelContext) {
     console.warn(
       "[webmcp] document.modelContext is not available in this browser. " +
         "Enable chrome://flags/#enable-webmcp-testing, or open this page in ChatGPT's in-app browser."
@@ -180,7 +196,7 @@ export function registerDynamicTools(ctx: ToolSurfaceContext): () => void {
     // registerTool() returns a Promise that can reject (e.g. a name collision
     // with a declarative form) — always handled, never left as an unhandled
     // rejection, regardless of what causes a given registration to fail.
-    document.modelContext.registerTool({ ...tool, execute: instrument(tool) }, { signal: controller.signal }).catch((err) => {
+    modelContext.registerTool({ ...tool, execute: instrument(tool) }, { signal: controller.signal }).catch((err) => {
       console.warn(`[webmcp] failed to register tool "${tool.name}":`, err);
     });
   }

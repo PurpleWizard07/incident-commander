@@ -40,7 +40,14 @@ export function EvidenceSpotlight() {
     : toolResultText(active.record.result) || active.record.error || "No result.";
 
   return (
-    <div key={active.record.id} className="pointer-events-none absolute right-5 top-[186px] z-30 w-[26rem] max-w-[85%]">
+    <div
+      key={active.record.id}
+      // Right-anchored, but offset past the agent lane when it is open —
+      // otherwise the overlay showing what the agent is reading renders
+      // underneath the panel showing that it is reading.
+      style={{ right: "calc(1.25rem + var(--ic-lane-inset, 0px))" }}
+      className="pointer-events-none absolute top-[186px] z-30 w-[26rem] max-w-[85%] transition-[right] duration-200 ease-out"
+    >
       <FloatCard className="animate-fade-up pointer-events-auto overflow-hidden" glow="settled">
         <div className="flex items-center gap-2.5 border-b border-ic-border/70 bg-ic-accent/[0.07] px-4 py-2.5">
           {isRunbook ? (
