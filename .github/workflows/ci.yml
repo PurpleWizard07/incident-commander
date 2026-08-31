@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  PRODUCTION_URL: https://incident-commander-461.netlify.app
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r typecheck
+
+  sim-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Determinism, evidence-integrity, correlation-contract, remediation, shapes
+        run: pnpm --filter @incident-commander/sim test
+
+  lighthouse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm production is reachable
+        run: curl -sf -o /dev/null "$PRODUCTION_URL"
+      - name: Run Lighthouse against production (Agentic Browsing + the rest)
+        run: |
+          npx --yes lighthouse "$PRODUCTION_URL" \
+            --only-categories=agentic-browsing,performance,accessibility,best-practices,seo \
+            --preset=desktop \
+            --chrome-flags="--headless=new --no-sandbox" \
+            --output=json --output=html \
+            --output-path=./lighthouse-report
+      - name: Enforce Agentic Browsing and Accessibility pass fully
+        run: |
+          node -e '
+            const r = require("./lighthouse-report.report.json");
+            const cats = r.categories;
+            console.log("Scores:", Object.fromEntries(Object.entries(cats).map(([k, v]) => [k, v.score])));
+            const agentic = cats["agentic-browsing"].score;
+            const a11y = cats["accessibility"].score;
+            if (agentic !== 1) { console.error("agentic-browsing score is " + agentic + ", required 1"); process.exit(1); }
+            if (a11y !== 1) { console.error("accessibility score is " + a11y + ", required 1"); process.exit(1); }
+          '
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-report
+          path: lighthouse-report.report.*
