@@ -24,6 +24,7 @@ deno.lock
 /incident-commander.md
 /implementation-plan-review.md
 /details.md
+/SUBMISSION-TEXT.md
 
 # Raw per-run eval trace logs — verbose mechanical evidence, not the deliverable.
 # evals/RESULTS.md (the aggregated pass/fail summary) is what's committed.
