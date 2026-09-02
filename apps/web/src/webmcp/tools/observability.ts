@@ -129,6 +129,7 @@ export const queryLogs = {
       toMinute: { type: "number" },
       reason: REASON_PROPERTY,
     },
+    required: ["reason"],
   },
   annotations: { readOnlyHint: true, untrustedContentHint: true },
   execute: async (input: Record<string, unknown>) => {
@@ -157,6 +158,7 @@ export const searchTraces = {
       status: { type: "string", enum: ["ok", "error", "any"], description: "Default error." },
       reason: REASON_PROPERTY,
     },
+    required: ["reason"],
   },
   annotations: { readOnlyHint: true, untrustedContentHint: true },
   execute: async (input: Record<string, unknown>) => {
@@ -184,6 +186,7 @@ export const compareMetrics = {
       toMinute: { type: "number" },
       reason: REASON_PROPERTY,
     },
+    required: ["reason"],
   },
   annotations: { readOnlyHint: true },
   execute: async (input: Record<string, unknown>) => {

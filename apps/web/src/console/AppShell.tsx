@@ -4,7 +4,7 @@ import { Nav, type Section } from "./Nav.js";
 import { Ground, SeverityLeak, type GroundTone } from "./Surface.js";
 import { IncidentWorkspace } from "./IncidentWorkspace.js";
 import { ServicesPage, DeploymentsPage, AlertsPage, RunbooksPage, ActivityPage } from "./SupportingPages.js";
-import { AgentLane, AgentRail } from "./AgentLane.js";
+import { AgentInvitation, AgentLane, AgentRail } from "./AgentLane.js";
 import { useConsoleData } from "./useConsoleData.js";
 import { useToolRecords } from "./toolActivity.js";
 import { hasAgentInterface } from "../webmcp/registerTools.js";
@@ -90,6 +90,15 @@ export function AppShell() {
   //    lane is where this browser is told, plainly, that nothing can drive the
   //    console but the person sitting there.
   const [laneOpen, setLaneOpen] = useState(() => !hasAgentInterface());
+  // ── The other half of that decision ──
+  //
+  // Starting closed is right for the workspace and wrong for the newcomer: the
+  // one sentence telling them what to ask lives inside the lane, so closing it
+  // for exactly the browsers that CAN run an agent hides the instruction from
+  // the only people able to follow it. `AgentInvitation` puts that sentence on
+  // the sheet instead, under the narrowest conditions that fix the problem —
+  // agent interface present, no call yet, lane collapsed, not dismissed.
+  const [inviteDismissed, setInviteDismissed] = useState(false);
 
   const incidentId = data.incident?.id ?? null;
   const incidentState = data.incident?.state ?? null;
@@ -166,6 +175,18 @@ export function AppShell() {
 
             {!laneOpen && (
               <AgentRail pendingCount={data.pendingApprovals.length} onOpen={() => setLaneOpen(true)} />
+            )}
+
+            {!laneOpen && !inviteDismissed && records.length === 0 && hasAgentInterface() && (
+              <div className="pointer-events-none absolute bottom-4 right-[52px] z-40 flex justify-end">
+                <AgentInvitation
+                  onOpen={() => {
+                    setInviteDismissed(true);
+                    setLaneOpen(true);
+                  }}
+                  onDismiss={() => setInviteDismissed(true)}
+                />
+              </div>
             )}
 
             {laneOpen && (

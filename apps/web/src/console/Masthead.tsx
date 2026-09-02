@@ -4,7 +4,26 @@ import { ChevronIcon, ClockIcon } from "./icons.js";
 import { badge, segment, selectClass, type BadgeTone } from "./ui.js";
 
 const ROLES = ["observer", "responder", "approver"];
-const SCENARIOS = ["INC-4821", "INC-4822", "INC-4823", "INC-4824", "INC-4825"];
+
+/**
+ * The picker used to list bare ids. Five options reading `INC-4821` … `INC-4825`
+ * tell someone opening this console for the first time nothing at all about
+ * what they are switching between, so choosing one is a coin flip they have to
+ * leave the page (to the README) to resolve.
+ *
+ * The titles are symptom-level and already public in the README's scenario
+ * table — "Checkout degradation" is what the alert said, not what caused it —
+ * so this leaks no ground truth (plan §3.9). The cause of each is still only
+ * recoverable by investigating.
+ */
+const SCENARIOS: { id: string; title: string }[] = [
+  { id: "INC-4821", title: "Checkout degradation" },
+  { id: "INC-4822", title: "Platform-wide latency" },
+  { id: "INC-4823", title: "Checkout pricing errors" },
+  { id: "INC-4824", title: "Notification backlog" },
+  { id: "INC-4825", title: "Payment provider failure" },
+];
+const SCENARIO_IDS = SCENARIOS.map((s) => s.id);
 
 /**
  * ═══ The session bar ═══
@@ -18,9 +37,10 @@ const SCENARIOS = ["INC-4821", "INC-4822", "INC-4823", "INC-4824", "INC-4825"];
  * picker are exactly what make `toolchange` and "the investigation
  * generalizes" observable by hand (plan §8, §5) — but now they are designed
  * instruments: role is a segmented switch with a sliding bone indicator, the
- * clock is a live chip, and the whole bar is 52px so its bottom hairline lines
- * up with the command rail's brand cell and runs unbroken across the top of
- * the screen.
+ * clock is a live chip, and the bar's resting height is 52px so its bottom
+ * hairline lines up with the command rail's brand cell and runs unbroken across
+ * the top of the screen. It grows past 52px only when a viewport is too narrow
+ * to hold the controls in one row — see the comment on the element itself.
  */
 export function SessionBar({
   sectionLabel,
@@ -44,25 +64,40 @@ export function SessionBar({
   const roleIndex = Math.max(0, ROLES.indexOf(activeRole));
 
   return (
-    <header className="relative z-10 flex h-[52px] shrink-0 items-center gap-4 border-b border-ic-border px-5">
+    /* `min-h` + `flex-wrap`, not a fixed `h-[52px]`: at desktop widths the
+       contents fit one row and the 52px hairline still lines up with the
+       command rail's brand cell, but on a narrow viewport the controls wrap to
+       a second row instead of overflowing the screen — which is what they did,
+       measured at 390px, taking the whole sheet with them. */
+    <header className="relative z-10 flex min-h-[52px] shrink-0 flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-ic-border px-5 py-1.5">
       <div className="flex min-w-0 items-baseline gap-3">
         <span className="ic-overline text-ic-text-dim">Incident Commander</span>
         <span aria-hidden="true" className="h-3 w-px bg-ic-border-strong" />
         <span className="truncate text-[12.5px] font-medium tracking-[-0.01em] text-ic-text">{sectionLabel}</span>
       </div>
 
-      <div className="ml-auto flex items-center gap-3">
+      {/* The group wraps as a unit AND internally: at 390px the scenario
+          picker alone is most of the row, so without this the role switch and
+          the clock were pushed off the edge and clipped — not scrollable,
+          just gone. The hairline dividers only make sense in a single row, so
+          they leave when it stops being one. */}
+      <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1.5">
         <label className="flex items-center gap-2">
-          <span className="ic-overline">Scenario</span>
+          {/* `sr-only`, not `hidden`: below 768px this word plus its gap is ~70px
+              of a ~285px row and the select alone needs 240, so keeping it
+              visible pushed the control off the left edge and under the command
+              rail. It stays in the accessibility tree, since it is the select's
+              only label. */}
+          <span className="ic-overline max-md:sr-only">Scenario</span>
           <span className="relative flex items-center">
             <select
-              value={scenarioId && SCENARIOS.includes(scenarioId) ? scenarioId : SCENARIOS[0]}
+              value={scenarioId && SCENARIO_IDS.includes(scenarioId) ? scenarioId : SCENARIO_IDS[0]}
               onChange={(e) => onScenarioChange?.(e.target.value)}
-              className={selectClass()}
+              className={selectClass("max-w-[17rem]")}
             >
               {SCENARIOS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
+                <option key={s.id} value={s.id}>
+                  {s.id} · {s.title}
                 </option>
               ))}
             </select>
@@ -70,7 +105,7 @@ export function SessionBar({
           </span>
         </label>
 
-        <span aria-hidden="true" className="h-4 w-px bg-ic-border" />
+        <span aria-hidden="true" className="h-4 w-px bg-ic-border max-md:hidden" />
 
         <div className="flex items-center gap-2">
           <span className="ic-overline">Role</span>
@@ -84,6 +119,11 @@ export function SessionBar({
               className="pointer-events-none absolute inset-y-[2px] left-[2px] w-[calc((100%-4px)/3)] rounded-[4px] bg-ic-text transition-transform duration-250 ease-out"
               style={{ transform: `translateX(${roleIndex * 100}%)` }}
             />
+            {/* Full words, not `r.slice(0, 3)`. The old truncation rendered
+                approver as "app", which reads as "application" — a confusing
+                label on the one control that decides whether the agent may
+                touch production at all. The bar wraps now, so the extra width
+                costs nothing. */}
             {ROLES.map((r) => (
               <button
                 key={r}
@@ -91,13 +131,13 @@ export function SessionBar({
                 aria-pressed={r === activeRole}
                 className={segment(r === activeRole)}
               >
-                {r.slice(0, 3)}
+                {r}
               </button>
             ))}
           </div>
         </div>
 
-        <span aria-hidden="true" className="h-4 w-px bg-ic-border" />
+        <span aria-hidden="true" className="h-4 w-px bg-ic-border max-md:hidden" />
 
         <span
           title={accelerated ? "Simulation clock is advancing" : "Simulation clock is held"}
@@ -156,19 +196,19 @@ export function IncidentMasthead({ incident, glowing }: { incident: Incident; gl
           glowing ? "bg-ic-accent" : "bg-transparent"
         }`}
       />
-      <div className="flex items-center gap-2.5">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
         <span className="font-mono text-[11px] font-medium tracking-[0.09em] text-ic-text-dim">{incident.id}</span>
         <span className={badge(severityTone(incident.severity))}>{incident.severity}</span>
         <span className={badge("neutral")}>
           <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${STATE_DOT[incident.state] ?? "bg-ic-text-faint"}`} />
           {incident.state}
         </span>
-        <span aria-hidden="true" className="h-px flex-1 bg-ic-border/60" />
-        <span className="font-mono text-[10.5px] text-ic-text-faint">
+        <span aria-hidden="true" className="h-px flex-1 bg-ic-border/60 max-md:hidden" />
+        <span className="font-mono text-[10.5px] text-ic-text-faint max-md:ml-auto">
           opened <span className="ic-num text-ic-text-dim">{incident.openedAt.slice(11, 16)}</span>
         </span>
       </div>
-      <h1 className="ic-display mt-2.5 text-[29px]">{incident.title}</h1>
+      <h1 className="ic-display mt-2.5 text-[29px] max-md:text-[22px]">{incident.title}</h1>
       <p className="ic-meta mt-2 text-ic-text-faint">
         {incident.affectedServices.length} service{incident.affectedServices.length === 1 ? "" : "s"} affected
         <span className="mx-2 opacity-40">/</span>

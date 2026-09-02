@@ -4,6 +4,7 @@ import { toolResultText } from "./toolResultText.js";
 import { ApprovalCard } from "./ApprovalCard.js";
 import { describeToolSurface, hasAgentInterface, type ToolCallRecord, type ToolSurfaceContext } from "../webmcp/registerTools.js";
 import { AgentIcon, ArrowRightIcon, AuthorityIcon, CheckIcon, CrossIcon, SpinnerIcon } from "./icons.js";
+import { FloatCard } from "./Surface.js";
 
 /**
  * ═══ The agent lane ═══
@@ -191,6 +192,67 @@ function StandingBy() {
 
       {!hasAgentInterface() && <NoAgentNotice />}
     </div>
+  );
+}
+
+/**
+ * ═══ The invitation ═══
+ *
+ * A bug of composition, not of code. `StandingBy` above holds the one sentence
+ * that tells a newcomer how to start — *"Investigate the open incident in this
+ * console and tell me what caused it"* — and the lane defaults to CLOSED
+ * whenever an agent interface is present (see `AppShell`, which is right to do
+ * that: the drawer would otherwise cover the workspace at first paint).
+ *
+ * The two rules compose badly. The instruction ends up shown only to browsers
+ * that cannot act on it, and hidden from every browser that can — which is
+ * precisely the ChatGPT-in-app-browser or flagged-Chrome session it was written
+ * for. Someone landing here with a working agent gets a dense console and no
+ * indication that asking is the point.
+ *
+ * So the sentence also lives out here, as a small floating cue on the sheet,
+ * under tight conditions: only with an agent interface actually present, only
+ * before the first tool call, only while the lane is collapsed, and only until
+ * dismissed. It disappears permanently the moment the agent does anything,
+ * because from then on the lane itself is the answer.
+ *
+ * It is a `FloatCard` for the same reason the approval card is: it has landed
+ * on top of the console rather than being part of it, and it will leave.
+ */
+export function AgentInvitation({ onOpen, onDismiss }: { onOpen: () => void; onDismiss: () => void }) {
+  return (
+    <FloatCard className="animate-fade-up pointer-events-auto w-[19rem] max-w-[calc(100vw-5.5rem)] overflow-hidden">
+      <div className="flex items-center gap-2 border-b border-ic-border/70 px-3.5 py-2">
+        <AgentIcon size={13} className="text-ic-accent" />
+        <h3 className="ic-overline text-ic-text-dim">Ask your agent</h3>
+        <span aria-hidden="true" className="h-px flex-1 bg-ic-border/60" />
+        <button
+          onClick={onDismiss}
+          aria-label="Dismiss agent prompt"
+          title="Dismiss"
+          className="-mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded text-ic-text-faint transition-colors duration-150 hover:bg-ic-panel-2 hover:text-ic-text"
+        >
+          <CrossIcon size={10} />
+        </button>
+      </div>
+      {/* Spans, not `<blockquote>`/`<p>`: a button's content model is phrasing
+          content, and flow elements inside one are invalid HTML even though
+          every browser renders them. The whole body is the target rather than a
+          small "open" affordance, which also keeps it comfortably over the WCAG
+          2.2 target-size floor. */}
+      <button onClick={onOpen} className="group block w-full px-3.5 py-3 text-left">
+        <span className="block border-l-2 border-ic-accent/50 pl-2.5 text-[12.5px] leading-[1.5] text-ic-text">
+          Investigate the open incident in this console and tell me what caused it.
+        </span>
+        <span className="mt-2.5 flex items-center gap-1.5 font-mono text-[10px] leading-[1.6] text-ic-text-faint">
+          Every call lands in the agent lane and lights the region it concerns
+          <ArrowRightIcon
+            size={11}
+            className="shrink-0 opacity-50 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:opacity-100"
+          />
+        </span>
+      </button>
+    </FloatCard>
   );
 }
 

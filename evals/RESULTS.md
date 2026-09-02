@@ -98,6 +98,39 @@ Re-running each condition several times would be needed to say anything statisti
 about efficiency; the headline claim of this ablation is the pass-rate result above, which is
 stable and directly falsifiable by anyone re-running the harness.
 
+## A second gap in this harness: the `reason` parameter was never exercised
+
+Found 2026-09-02, while reviewing the project against its own claims. Recording it here rather
+than quietly fixing it, for the same reason the 4824-04 correction below is recorded.
+
+Every read-only tool carries a `reason` parameter — one sentence saying what the agent is trying to
+establish — and the console renders it live under each call in the agent lane. It is the field that
+makes that lane an investigation narrative instead of a list of tool names, which is a substantial
+part of this project's shared-context argument.
+
+**Across all 290 logged tool calls in the ten sessions above, `reason` was populated zero times.**
+The cause is not model behaviour: `evals/prompt.mjs`'s hand-written `SCHEMA` mirror — a restatement
+of each tool's real `inputSchema`, not a copy of it — omitted `reason` from every tool except
+`request_approval`. The agents were never told the parameter existed, so they could not have sent
+it. The tool *descriptions* in the ablation are verbatim from the real registered tools, as stated
+above; the schema line beside each one is the part that had drifted.
+
+So the numbers above stand — the pass/fail criteria in `cases.mjs` concern diagnosis, distractor
+rejection and remediation choice, none of which touch `reason` — but they say nothing at all about
+whether an agent populates it. That path was untested rather than tested-and-passing.
+
+Two changes followed, neither of which retroactively affects the runs above:
+
+- `reason` is now **required** on all 13 read-only tools rather than optional, so the question is
+  removed instead of answered. `instrument()` still reads it defensively, so a model that ignores
+  the schema degrades to the previous behaviour rather than failing the call.
+- `evals/prompt.mjs`'s mirror now includes it, and carries a comment saying it must be kept in step
+  with the real schemas.
+
+Re-running the ten sessions against the corrected harness would be the honest way to quantify the
+`reason` path. That was not done before the submission deadline, so it is stated here as an
+untested path, not as a passing one.
+
 ## The one miss: 4824-04, and a correction to this write-up
 
 `4824-04` failed on **both** the tuned and naive INC-4824 sessions — the only case either variant

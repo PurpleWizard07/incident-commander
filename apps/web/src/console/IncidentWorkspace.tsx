@@ -109,22 +109,22 @@ export function IncidentWorkspace({ data, refresh }: { data: ConsoleData; refres
             </div>
           ))}
         </div>
-        <div className="grid h-[292px] shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] border-b border-ic-border">
-          <div className="border-r border-ic-border p-4">
+        <div className="grid h-[292px] shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] border-b border-ic-border max-md:h-auto max-md:grid-cols-1">
+          <div className="border-r border-ic-border p-4 max-md:h-[250px] max-md:border-b max-md:border-r-0">
             <Skeleton className="h-full w-full" />
           </div>
-          <div className="p-4">
+          <div className="p-4 max-md:h-[260px]">
             <Skeleton className="h-full w-full" />
           </div>
         </div>
-        <div className="min-h-0 flex-1 p-4">
+        <div className="min-h-0 flex-1 p-4 max-md:min-h-[340px]">
           <Skeleton className="h-full w-full" />
         </div>
-        <div className="grid h-[232px] shrink-0 grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] border-t border-ic-border">
-          <div className="border-r border-ic-border p-4">
+        <div className="grid h-[232px] shrink-0 grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] border-t border-ic-border max-md:h-auto max-md:grid-cols-1">
+          <div className="border-r border-ic-border p-4 max-md:h-[240px] max-md:border-b max-md:border-r-0">
             <Skeleton className="h-full w-full" />
           </div>
-          <div className="p-4">
+          <div className="p-4 max-md:h-[240px]">
             <Skeleton className="h-full w-full" />
           </div>
         </div>
@@ -180,11 +180,11 @@ function Loaded({ data, incident, refresh }: { data: ConsoleData; incident: Inci
 
       <VitalsStrip items={buildVitals(incident, data.serviceHealth)} className="border-y border-ic-border" />
 
-      <div className="grid h-[292px] shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] border-b border-ic-border">
+      <div className="grid h-[292px] shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] border-b border-ic-border max-md:h-auto max-md:grid-cols-1">
         <Region
           label="Topology"
           glow={glowState(topologyGlow)}
-          className="border-r border-ic-border"
+          className="border-r border-ic-border max-md:h-[250px] max-md:border-b max-md:border-r-0"
           bodyClassName="px-2 pb-2"
         >
           {Object.keys(data.serviceHealth).length === 0 ? (
@@ -197,7 +197,7 @@ function Loaded({ data, incident, refresh }: { data: ConsoleData; incident: Inci
           )}
         </Region>
 
-        <Region label="Signal" glow={glowState(metricsGlow)}>
+        <Region label="Signal" glow={glowState(metricsGlow)} className="max-md:h-[260px]">
           {data.metricSeries.length === 0 ? (
             <div className="h-full px-4 pb-4">
               <Skeleton className="h-full w-full" />
@@ -208,7 +208,7 @@ function Loaded({ data, incident, refresh }: { data: ConsoleData; incident: Inci
         </Region>
       </div>
 
-      <Region label="Evidence" glow={glowState(evidenceGlow)} className="min-h-[184px] flex-1">
+      <Region label="Evidence" glow={glowState(evidenceGlow)} className="min-h-[184px] flex-1 max-md:min-h-[340px]">
         <EvidenceTabs
           logs={data.logs}
           logsNote={data.logsNote}
@@ -220,14 +220,14 @@ function Loaded({ data, incident, refresh }: { data: ConsoleData; incident: Inci
       </Region>
 
       <div
-        className={`grid h-[232px] shrink-0 border-t border-ic-border ${
+        className={`grid h-[232px] shrink-0 border-t border-ic-border max-md:h-auto max-md:grid-cols-1 ${
           isObserver ? "grid-cols-1" : "grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]"
         }`}
       >
         <Region
           label="Timeline"
           glow={glowState(timelineGlow)}
-          className={isObserver ? "" : "border-r border-ic-border"}
+          className={`max-md:h-[250px] ${isObserver ? "" : "border-r border-ic-border max-md:border-b max-md:border-r-0"}`}
         >
           <Timeline
             events={incident.timeline}
@@ -237,7 +237,7 @@ function Loaded({ data, incident, refresh }: { data: ConsoleData; incident: Inci
         </Region>
 
         {!isObserver && (
-          <Region label="Open incident">
+          <Region label="Open incident" className="max-md:h-[250px]">
             <CreateIncidentForm onSubmitted={refresh} />
           </Region>
         )}

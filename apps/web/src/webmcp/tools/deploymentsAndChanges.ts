@@ -39,6 +39,7 @@ export const getRecentDeployments = {
       withinMinutes: { type: "number", description: "Look-back window in minutes. Default 120, max 4320." },
       reason: REASON_PROPERTY,
     },
+    required: ["reason"],
   },
   annotations: { readOnlyHint: true },
   execute: async (input: Record<string, unknown>) => {
@@ -68,6 +69,7 @@ export const getRecentChanges = {
       type: { type: "string", enum: ["feature_flag", "config", "scaling", "scheduled_job", "infrastructure"] },
       reason: REASON_PROPERTY,
     },
+    required: ["reason"],
   },
   annotations: { readOnlyHint: true },
   execute: async (input: Record<string, unknown>) => {

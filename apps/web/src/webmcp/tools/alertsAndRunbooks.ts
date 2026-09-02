@@ -39,7 +39,7 @@ export const inspectAlert = {
       alertId: { type: "string" },
       reason: REASON_PROPERTY,
     },
-    required: ["alertId"],
+    required: ["alertId", "reason"],
   },
   annotations: { readOnlyHint: true },
   execute: async (input: Record<string, unknown>) => {
@@ -66,6 +66,7 @@ export const getRunbook = {
       runbookId: { type: "string" },
       reason: REASON_PROPERTY,
     },
+    required: ["reason"],
   },
   annotations: { readOnlyHint: true },
   execute: async (input: Record<string, unknown>) => {

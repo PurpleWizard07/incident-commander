@@ -13,19 +13,24 @@ if (!sessionId || !scenarioId || !["tuned", "naive"].includes(variant)) {
 
 const DESCRIPTIONS = variant === "tuned" ? TUNED : NAIVE;
 
+// Hand-written mirror of each tool's real `inputSchema`. It drifted once, and
+// the drift was invisible: every read-only tool's REQUIRED `reason` parameter
+// was missing here, so the ten published sessions never populated it in 290
+// logged calls — see evals/RESULTS.md's note on the reason-parameter gap. If a
+// tool's schema changes in apps/web/src/webmcp/tools/, change it here too.
 const SCHEMA = {
-  get_active_incidents: `{ severity?: "SEV-1"|"SEV-2"|"SEV-3" }`,
-  get_incident: `{ incidentId: string }`,
-  get_incident_timeline: `{ incidentId: string, sinceMinute?: number }`,
-  get_service_health: `{ service: string }`,
-  get_service_dependencies: `{ service: string, direction?: "upstream"|"downstream"|"both" }`,
-  get_recent_deployments: `{ service?: string, withinMinutes?: number }`,
-  get_recent_changes: `{ service?: string, withinMinutes?: number, type?: "feature_flag"|"config"|"scaling"|"scheduled_job"|"infrastructure" }`,
-  query_logs: `{ service?: string, level?: "DEBUG"|"INFO"|"WARN"|"ERROR"|"FATAL", contains?: string, fromMinute?: number, toMinute?: number, limit?: number }`,
-  search_traces: `{ service?: string, status?: "ok"|"error"|"any", limit?: number }`,
-  compare_metrics: `{ services?: string[], metrics?: string[], fromMinute?: number, toMinute?: number }`,
-  inspect_alert: `{ alertId: string }`,
-  get_runbook: `{ symptom?: string, service?: string, runbookId?: string }`,
+  get_active_incidents: `{ reason: string, severity?: "SEV-1"|"SEV-2"|"SEV-3" }`,
+  get_incident: `{ reason: string, incidentId: string }`,
+  get_incident_timeline: `{ reason: string, incidentId: string, sinceMinute?: number }`,
+  get_service_health: `{ reason: string, service: string }`,
+  get_service_dependencies: `{ reason: string, service: string, direction?: "upstream"|"downstream"|"both" }`,
+  get_recent_deployments: `{ reason: string, service?: string, withinMinutes?: number }`,
+  get_recent_changes: `{ reason: string, service?: string, withinMinutes?: number, type?: "feature_flag"|"config"|"scaling"|"scheduled_job"|"infrastructure" }`,
+  query_logs: `{ reason: string, service?: string, level?: "DEBUG"|"INFO"|"WARN"|"ERROR"|"FATAL", contains?: string, fromMinute?: number, toMinute?: number, limit?: number }`,
+  search_traces: `{ reason: string, service?: string, status?: "ok"|"error"|"any", limit?: number }`,
+  compare_metrics: `{ reason: string, services?: string[], metrics?: string[], fromMinute?: number, toMinute?: number }`,
+  inspect_alert: `{ reason: string, alertId: string }`,
+  get_runbook: `{ reason: string, symptom?: string, service?: string, runbookId?: string }`,
   assign_incident: `{ incidentId: string, assignee: string }`,
   add_incident_note: `{ incidentId: string, note: string, evidenceRefs?: object[] }`,
   resolve_incident: `{ incidentId: string, resolutionSummary: string, rootCause: string }`,
@@ -34,7 +39,7 @@ const SCHEMA = {
   restart_service: `{ service: string, approvalId: string, strategy?: "rolling"|"all_at_once" }`,
   scale_service: `{ service: string, approvalId: string, instances?: number, poolSize?: number }`,
   disable_feature_flag: `{ service: string, flagName: string, approvalId: string }`,
-  get_pending_approvals: `{ incidentId?: string }`,
+  get_pending_approvals: `{ reason: string, incidentId?: string }`,
   request_approval: `{ incidentId: string, tool: string, args: object, reason: string, evidenceRefs: object[], expectedEffect: string, notCovered: string, risk: "low"|"medium"|"high" }`,
   record_approval: `{ approvalId: string, decision: "approved"|"rejected", approvalToken: string }`,
 };

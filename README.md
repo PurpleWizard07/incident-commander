@@ -8,26 +8,6 @@ A production incident-response console where an AI agent investigates through st
 tools while the human responder watches the same evidence in the same interface, and retains sole
 authority to change production. Built for the WebMCP Challenge.
 
-## Why this is a WebMCP project and not a chat wrapper over an MCP server
-
-A server-side MCP over a Datadog- or PagerDuty-shaped tool set would produce a chat transcript
-describing an incident — a reasonable thing to build, and not what makes this project specifically
-a WebMCP one. **The agent operates the same console the human is watching.** All 12 investigation
-tools have a specified visible effect in the UI — topology nodes pulse, the evidence panel
-auto-switches tabs and scrolls to the matching log line, the metrics chart bolds the series and
-marks the deploy that caused it, an overlay spotlights the runbook being read. The approval card the
-agent's `request_approval` call produces sits beside the graph that justifies it, the topology node
-that turned red, and the log line that proves it — in the same interface the responder is already
-looking at, at the moment of the decision. That shared context is only possible because the tool
-calls and the console rendering share an origin's DOM; a server MCP has no equivalent. Full argument
-and implementation in [`docs/WEBMCP.md`](docs/WEBMCP.md).
-
-**Human authority boundary:** WebMCP is the agent's interface, not the security boundary. Every one
-of the four production-changing tools (`rollback_deployment`, `restart_service`, `scale_service`,
-`disable_feature_flag`) requires an approval token that only a real, trusted click in the console
-can mint — an agent that calls `request_approval` and then tries to approve its own request is
-denied and the attempt is audited. Full model in [`docs/SECURITY.md`](docs/SECURITY.md).
-
 ## Try it
 
 ### ChatGPT in-app browser (primary judge surface)
@@ -74,13 +54,35 @@ netlify dev --filter @incident-commander/api -c "pnpm --filter web dev" --target
 (`netlify dev` needs Windows Developer Mode enabled if developing on Windows — a symlink-permission
 issue, not a code issue; Linux, including the actual deployed runtime, doesn't hit this.)
 
+## Why this is a WebMCP project and not a chat wrapper over an MCP server
+
+A server-side MCP over a Datadog- or PagerDuty-shaped tool set would produce a chat transcript
+describing an incident — a reasonable thing to build, and not what makes this project specifically
+a WebMCP one. **The agent operates the same console the human is watching.** All 12 investigation
+tools have a specified visible effect in the UI — topology nodes pulse, the evidence panel
+auto-switches tabs and scrolls to the matching log line, the metrics chart bolds the series and
+marks the deploy that caused it, an overlay spotlights the runbook being read. The approval card the
+agent's `request_approval` call produces sits beside the graph that justifies it, the topology node
+that turned red, and the log line that proves it — in the same interface the responder is already
+looking at, at the moment of the decision. That shared context is only possible because the tool
+calls and the console rendering share an origin's DOM; a server MCP has no equivalent. Full argument
+and implementation in [`docs/WEBMCP.md`](docs/WEBMCP.md).
+
+**Human authority boundary:** WebMCP is the agent's interface, not the security boundary. Every one
+of the four production-changing tools (`rollback_deployment`, `restart_service`, `scale_service`,
+`disable_feature_flag`) requires an approval token that only a real, trusted click in the console
+can mint — an agent that calls `request_approval` and then tries to approve its own request is
+denied and the attempt is audited. Full model in [`docs/SECURITY.md`](docs/SECURITY.md).
+
 ## Tool surface
 
 21 imperative tools registered via `document.modelContext.registerTool()`, plus 2 declarative
 `<form toolname="…">` tools (`add_incident_note`, `create_incident`) — 23 distinct tools, all
 audited against a real use. The registered surface changes with application state (role, incident
-selection, incident state, approval presence) rather than being a static dump at page load. Full
-breakdown in [`docs/WEBMCP.md`](docs/WEBMCP.md).
+selection, incident state, approval presence) rather than being a static dump at page load. Every
+read-only tool requires a `reason` — one sentence on what the call is meant to establish — which the
+console renders live beside the call, so the human is reading an investigation rather than a list of
+tool names. Full breakdown in [`docs/WEBMCP.md`](docs/WEBMCP.md).
 
 ## Verification — artifacts a judge can check, not just claims
 

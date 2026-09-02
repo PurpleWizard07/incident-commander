@@ -24,6 +24,7 @@ export const getPendingApprovals = {
       incidentId: { type: "string" },
       reason: REASON_PROPERTY,
     },
+    required: ["reason"],
   },
   annotations: { readOnlyHint: true, untrustedContentHint: true },
   execute: async (input: Record<string, unknown>) => {

@@ -34,6 +34,7 @@ export const getActiveIncidents = {
       severity: { type: "string", enum: ["SEV-1", "SEV-2", "SEV-3"], description: "Optional filter. Omit for all severities." },
       reason: REASON_PROPERTY,
     },
+    required: ["reason"],
   },
   annotations: { readOnlyHint: true },
   execute: async (input: Record<string, unknown>) => {
@@ -58,7 +59,7 @@ export const getIncident = {
       incidentId: { type: "string", description: "Incident identifier, for example INC-4821." },
       reason: REASON_PROPERTY,
     },
-    required: ["incidentId"],
+    required: ["incidentId", "reason"],
   },
   annotations: { readOnlyHint: true, untrustedContentHint: true },
   execute: async (input: Record<string, unknown>) => {
@@ -95,7 +96,7 @@ export const getIncidentTimeline = {
       sinceMinute: { type: "number", description: "Only return events at or after this minute offset. Omit for the full history." },
       reason: REASON_PROPERTY,
     },
-    required: ["incidentId"],
+    required: ["incidentId", "reason"],
   },
   annotations: { readOnlyHint: true },
   execute: async (input: Record<string, unknown>) => {

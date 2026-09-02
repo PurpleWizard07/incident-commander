@@ -118,14 +118,24 @@ const VITAL_TONES: Record<NonNullable<Vital["tone"]>, string> = {
  */
 export function VitalsStrip({ items, className = "" }: { items: Vital[]; className?: string }) {
   return (
-    <div className={`flex shrink-0 items-stretch ${className}`} role="group" aria-label="Incident vitals">
+    /* One row of N at desktop; a two-column grid below 768px. Four 24px
+       numerals cannot share ~280px of usable width — measured at 390px, the
+       values collided with each other and with their own captions. The
+       hairlines have to follow the wrap, so the dividers below are computed
+       per-position rather than being a blanket `border-l` on every item but
+       the first. */
+    <div
+      className={`flex shrink-0 items-stretch max-md:grid max-md:grid-cols-2 ${className}`}
+      role="group"
+      aria-label="Incident vitals"
+    >
       {items.map((v, i) => (
         <div
           key={v.label}
           title={v.title}
           className={`flex min-w-0 flex-1 flex-col justify-center gap-1.5 px-4 py-[11px] ${
             i > 0 ? "border-l border-ic-border/70" : ""
-          }`}
+          } ${i % 2 === 0 ? "max-md:border-l-0" : ""} ${i >= 2 ? "max-md:border-t max-md:border-t-ic-border/70" : ""}`}
         >
           <div className="flex items-baseline gap-1">
             <span className={`ic-num text-[24px] ${VITAL_TONES[v.tone ?? "ink"]}`}>{v.value}</span>

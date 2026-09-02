@@ -31,7 +31,7 @@ export const getServiceHealth = {
       service: { type: "string", enum: SERVICE_ENUM, description: "Which service to check." },
       reason: REASON_PROPERTY,
     },
-    required: ["service"],
+    required: ["service", "reason"],
   },
   annotations: { readOnlyHint: true },
   execute: async (input: Record<string, unknown>) => {
@@ -59,7 +59,7 @@ export const getServiceDependencies = {
       direction: { type: "string", enum: ["upstream", "downstream", "both"], description: "Which direction to return. Default both." },
       reason: REASON_PROPERTY,
     },
-    required: ["service"],
+    required: ["service", "reason"],
   },
   annotations: { readOnlyHint: true },
   execute: async (input: Record<string, unknown>) => {

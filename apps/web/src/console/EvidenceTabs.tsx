@@ -353,8 +353,8 @@ export function EvidenceTabs({
           ))}
 
         {tab === "deployments" && (
-          <div className="h-full overflow-y-auto">
-            <table className="w-full font-mono text-[11px]">
+          <div className="h-full overflow-y-auto max-md:overflow-x-auto">
+            <table className="w-full min-w-[560px] font-mono text-[11px]">
               <thead>
                 <tr className={theadRowClass}>
                   <Th className="w-[124px]">When</Th>
@@ -393,8 +393,8 @@ export function EvidenceTabs({
         )}
 
         {tab === "changes" && (
-          <div className="h-full overflow-y-auto">
-            <table className="w-full font-mono text-[11px]">
+          <div className="h-full overflow-y-auto max-md:overflow-x-auto">
+            <table className="w-full min-w-[560px] font-mono text-[11px]">
               <thead>
                 <tr className={theadRowClass}>
                   <Th className="w-[124px]">When</Th>

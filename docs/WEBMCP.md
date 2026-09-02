@@ -24,6 +24,26 @@ because their responses can contain free text this system did not author: `query
 `get_pending_approvals` (the requesting agent's own stated reason and evidence). See
 `docs/SECURITY.md`.
 
+## `reason` is a required parameter on every read-only tool
+
+All 13 read-only tools (the 12 investigation tools plus `get_pending_approvals`) require a `reason`
+string: one sentence saying what the agent is trying to establish with the call. The console renders
+it live under that call in the agent lane, which is what makes the lane an investigation the human
+can follow rather than a list of tool names scrolling past.
+
+It is required rather than optional on purpose, and the reason is a real finding rather than a
+principle. It was optional until 2026-09-02, and the eval harness's hand-written schema mirror had
+silently omitted it from every tool but `request_approval` — so across 290 logged tool calls in ten
+real sessions it was never once populated, and nobody noticed, because nothing failed. That is not
+evidence that models skip it; it is evidence that the field the shared-context argument leans on had
+never been exercised at all. Requiring it removes the question. Full account in
+[`evals/RESULTS.md`](../evals/RESULTS.md).
+
+The action tools are deliberately exempt. `create_incident` and `add_incident_note` reach the agent
+as `<form toolname>` elements that a *human* also fills in by hand, and a mandatory rationale field
+would make the human's form worse to serve the agent's narrative. The gated remediation tools carry
+their reasoning in the approval request instead, where a person actually reads it before deciding.
+
 ## Why declarative forms for these two, and not the rest
 
 The Lighthouse Agentic Browsing audit's `webmcp-form-coverage` check pointed at these two forms
