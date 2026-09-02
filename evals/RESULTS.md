@@ -29,8 +29,8 @@ separately on purpose (plan §21.4, §21.10).
 | Pass rate | 96.7% | 96.7% |
 
 **58 / 60 cases passed overall (96.7%).** The single miss on each side is the *same* case,
-`4824-04` — see [Known-unreachable case](#known-unreachable-case-4824-04) below; it is not a
-description-quality failure.
+`4824-04` — see [The one miss](#the-one-miss-4824-04-and-a-correction-to-this-write-up) below; it is
+not a description-quality failure.
 
 Every `mustNotCall` / distractor-rejection case passed on both variants: no session concluded
 `payments` caused INC-4821, took the `payments-v7` decoy in INC-4822, recommended a rollback for
@@ -81,41 +81,111 @@ session (from `evals/traces/*.jsonl`, `toolCallCount` in each grade result):
 | INC-4825 | 15 | 21 |
 | **Total** | **157** | **133** |
 
-No consistent direction — tuned used *more* calls overall here, almost entirely because the tuned
-INC-4824 session tried exhaustively wide `withinMinutes`/`type` windows on
-`get_recent_deployments`/`get_recent_changes` chasing a correlation that (see below) turns out to
-be structurally unreachable, while the naive session gave up on that thread sooner. This is **n=1
+No consistent direction — tuned used *more* calls overall here, almost entirely because of the
+68-call tuned INC-4824 session. Its tool histogram says where those calls went: `compare_metrics`
+21, `query_logs` 12, `get_recent_changes` 10, `get_runbook` 9, everything else in single digits.
+The dominant cost was not deploy hunting but a systematic sweep of `compare_metrics`, after a
+narrow-window call returned an onset equal to the window's own start. `onsetMinute` is the first
+deviating sample *inside the requested window*, so it necessarily equals `fromMinute` whenever the
+deviation predates the window — defensible, but a sharp edge. The agent read that as suspicious,
+then swept `toMinute` from 50 to 372 at `fromMinute: 0` to characterise the behaviour, and recorded
+its conclusion in its own note: *"compare_metrics onsetMinute is not usable for precise timing here
+(it always mirrors the queried fromMinute), so timing is established from logs/traces instead."*
+Widening it from `fromMinute: 0` did return the true onset (minute 8). This is **n=1
 per condition** — a single run each, not a sampled distribution — so it is reported as an
 observation, not a claim that description tuning changes efficiency in a particular direction.
 Re-running each condition several times would be needed to say anything statistically load-bearing
 about efficiency; the headline claim of this ablation is the pass-rate result above, which is
 stable and directly falsifiable by anyone re-running the harness.
 
-## Known-unreachable case: 4824-04
+## The one miss: 4824-04, and a correction to this write-up
 
-`4824-04` ("cites the weak notifications-v11 correlation in explicitly uncertain language when
-noting it") failed on **both** the tuned and naive INC-4824 sessions — the only case either variant
-missed.
+`4824-04` failed on **both** the tuned and naive INC-4824 sessions — the only case either variant
+missed. An earlier version of this document gave the wrong reason for that, confidently and at
+length. The corrected account is below; the original claim is restated in full under
+[The correction](#the-correction), so the record of what was said is not quietly edited away.
 
-Root cause, confirmed directly against the live API: `notifications-v11`
-(`packages/sim/src/scenarios/inc-4824-memory-leak.ts`, `DEPLOY_MINUTE = -3 * 24 * 60`, commented
-"weak correlation" in the source) sits 4,692 minutes before this scenario's `nowMinute` (372), but
-`apps/api/src/routes/deployments.ts` hard-caps `get_recent_deployments`'s `withinMinutes` at
-`Math.min(4320, ...)` regardless of what an agent requests. Queried directly at 4320, 5000, and the
-default window: empty every time. `get_incident_timeline` (unbounded) does not include it either,
-and no log or trace record in the scenario is tagged with `notifications-v11` — the id appears only
-in the (unreachable) `deployments` array and as `causalChangeId`, which is ground-truth bookkeeping
-never exposed in any API response (per this project's own standing rule). **No sequence of real
-tool calls can surface this correlation**, so no agent — however careful, however well-described
-its tools — can pass this specific case by investigating for real.
+### What the case actually checks
 
-This was almost certainly satisfied during Phase 8's manual verification (phase.md's Phase 8 exit
-checklist) by hand-typing a note through the console's own Add Note form to test the confidence
-engine's uncertainty-language detection in isolation — a reasonable way to test that mechanism, but
-it means this eval case tests something an autonomous investigation cannot actually reach.
+```js
+{ id: "4824-04",
+  description: "cites the weak notifications-v11 correlation in explicitly uncertain language when noting it",
+  grade: (trace) => trace.some(e =>
+    e.tool === "add_incident_note" && e.ok !== false &&
+    UNCERTAINTY_MARKERS.some(m => (e.args?.note ?? "").toLowerCase().includes(m))) }
 
-Left in the suite and reported as a genuine miss rather than quietly loosened or removed after
-seeing it fail, per plan §21.10's honesty commitment. This is a self-found gap in the eval design
-(and arguably in `INC-4824`'s scenario data / the deployments window cap), not evidence about tool-
-description quality — the other 5 cases on both INC-4824 sessions passed cleanly, including
-correctly identifying `notifications` as the cause and correctly declining to resolve the incident.
+UNCERTAINTY_MARKERS = ["unclear", "uncertain", "unexplained", "weak correlation",
+                       "does not fully explain", "cannot confirm", "not confident"]
+```
+
+The grader never looks for `notifications-v11`. It is a seven-phrase substring match over the text
+of any successful `add_incident_note` call. The case's own `description` promises more than the
+grader checks — that mismatch is itself part of the finding, and is left in the code as written
+rather than tidied up after the fact.
+
+### Why it failed
+
+Both sessions called `add_incident_note` exactly once, successfully. Neither note contained any of
+the seven phrases. Both notes were, in substance, thoroughly hedged:
+
+> "…**this is a mitigation, not a fix**. The GC-pause/OOM pattern will **very likely recur** since
+> no code/config change has been made … **Do not resolve this incident on a restart alone** —
+> verify queue_depth trends back toward baseline with compare_metrics, and escalate the memory leak
+> (code-level) and SMTP relay reliability separately." — tuned session
+
+> "…an intermittent `connection reset sending to SMTP relay` error is present … at a rate
+> consistent with baseline error_rate (0.0974 vs 0.08 baseline, not deviating) — this **looks
+> like** a pre-existing, unrelated background issue and is **not the incident driver**." — naive
+> session
+
+Both expressed exactly the calibrated uncertainty the case exists to test, in words the keyword
+list did not anticipate. **The failure is grader brittleness: a semantic property checked by
+substring match.** Both models passed the spirit and failed the letter.
+
+This is the more useful finding, and it generalises past this project: if an eval asserts that a
+model *reasoned* in a particular way, a keyword list will under-count it, and the direction of the
+error is predictable — false negatives on capable models, which are the ones most likely to phrase
+things in their own words.
+
+### The correction
+
+The previous version of this section claimed that `notifications-v11` was **structurally
+unreachable** — that `apps/api/src/routes/deployments.ts` caps `withinMinutes` at 4,320 while the
+deploy sits 4,692 minutes back, that no log or trace record carries the id, and therefore that "no
+sequence of real tool calls can surface this correlation," so no agent could pass the case by
+investigating honestly.
+
+The first half is true and the conclusion does not follow from it. `get_recent_deployments` really
+cannot return that deployment at any window an agent can request — re-verified against production on
+a fresh INC-4824 session at the default window, 4320, 5000 and 99999, and with `service=notifications`:
+`{"deployments":[]}` every time. But `query_logs` on that same session returns
+`"deployment":"notifications-v11"` on its very first entry. The generator stamps it on **every** notifications
+log line: `generators/logs.ts` attaches it at generation time via `activeDeploymentAt`, so it is in
+the response of any log query against that service. Both sessions saw it repeatedly, and the naive
+session reasoned about it correctly and unprompted:
+
+> "No new deployment or config/feature-flag change is on record for notifications or queue in this
+> window … **deployment stays notifications-v11 throughout**, so this is a runtime memory leak
+> building up in the running version, not a bad release or toggle."
+
+The original check searched the *scenario source file* for the literal string and found it only in
+the `deployments` array and as `causalChangeId`. It missed the deployment tag because that tag is
+never written into a log template — it is attached by the generator. A source grep was the wrong
+instrument, and the conclusion drawn from it was stated with more confidence than a source grep can
+support.
+
+Nothing about the numbers changes: the case genuinely fails, on both variants, and 58/60 stands.
+What changed is the reason. It is corrected here rather than in place because a write-up that
+argues for honest reporting should not silently rewrite its own errors, and because the mistake —
+concluding "unreachable" from an absence in the source rather than from the tool output an agent
+actually receives — is a live hazard for anyone else building a simulated eval environment.
+
+### What is still true, and still worth fixing
+
+`get_recent_deployments`' 4,320-minute cap does make `notifications-v11` invisible to the one tool
+whose job is surfacing deployments, on a scenario whose deploy is deliberately placed three days
+back. That is a real, if narrow, scenario/API-design wrinkle: an agent that reasons "let me check
+for a recent deploy" gets an empty list, while an agent that happens to read a log line gets the
+answer. It did not cause this failure, and it is not being changed this close to submission — the
+window cap and the scenario timing are both load-bearing elsewhere — but it is logged here as
+known.
