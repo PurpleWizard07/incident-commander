@@ -29,8 +29,17 @@ provider outage — the correct response is to escalate, not remediate).
 
 ## Docs
 
-- [README](/README.md): setup, both judge-browser test paths, scenario/seed parameters.
-- [docs/ARCHITECTURE.md](/docs/ARCHITECTURE.md): system design.
-- [docs/WEBMCP.md](/docs/WEBMCP.md): how the tool surface is built and why.
-- [docs/SECURITY.md](/docs/SECURITY.md): the authorization model, including the seeded
-  prompt-injection line in INC-4822's logs and why it changes nothing.
+Markdown docs live in the source repository, not on this origin — only the built console and its
+static assets are served here, so these are absolute links rather than site-relative ones.
+
+- [README](https://github.com/PurpleWizard07/incident-commander/blob/main/README.md): setup, both
+  judge-browser test paths, scenario/seed parameters.
+- [docs/ARCHITECTURE.md](https://github.com/PurpleWizard07/incident-commander/blob/main/docs/ARCHITECTURE.md):
+  system design.
+- [docs/WEBMCP.md](https://github.com/PurpleWizard07/incident-commander/blob/main/docs/WEBMCP.md):
+  how the tool surface is built and why.
+- [docs/SECURITY.md](https://github.com/PurpleWizard07/incident-commander/blob/main/docs/SECURITY.md):
+  the authorization model, including the seeded prompt-injection line in INC-4822's logs and why it
+  changes nothing.
+- [evals/RESULTS.md](https://github.com/PurpleWizard07/incident-commander/blob/main/evals/RESULTS.md):
+  the eval suite, the tuned-vs-naive tool-description ablation, and what was not measured.

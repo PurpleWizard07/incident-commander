@@ -74,7 +74,13 @@ const ACTION_TOOLS = [
 /** Plan §6.5 human-control tools (3). `record_approval`'s denial is deliberate — see that tool's own doc comment. */
 const APPROVAL_TOOLS = [getPendingApprovals, requestApproval, recordApproval];
 
-/** All 23 imperative tools (plan §0/§6) — the 2 declarative forms are Phase 7. */
+/**
+ * All 23 tool definitions. 21 of them are registered imperatively; the other
+ * two (`create_incident`, `add_incident_note`) are declarative-only and reach
+ * the agent as `<form toolname>` elements instead — they stay in this list
+ * only so `testInvokeTool` can drive their `execute` on the same instrumented
+ * path. `selectRegisteredTools` is what decides the imperative surface.
+ */
 const ALL_TOOLS = [...INVESTIGATION_TOOLS, ...ACTION_TOOLS, ...APPROVAL_TOOLS];
 
 /** Wraps a tool's `execute` with the start/settle instrumentation above — shared by the real WebMCP registration and `testInvokeTool` below, so a manual test call exercises the identical code path a live agent's call would. */
@@ -209,9 +215,9 @@ export function registerDynamicTools(ctx: ToolSurfaceContext): () => void {
  * tool by name through the exact same instrumented path a live agent's call
  * takes (start/settle events, reason capture), for verifying the reactivity
  * contract without needing an LLM in the loop. Harmless to leave registered
- * — it can only call the same 23 tools any agent already can, all subject
- * to the same server-side authorization, and does nothing unless invoked
- * from the browser console.
+ * — it can only reach the same 23 tools any agent already can (21 imperative,
+ * plus the 2 declarative forms' handlers), all subject to the same server-side
+ * authorization, and it does nothing unless invoked from the browser console.
  */
 export function testInvokeTool(name: string, input: Record<string, unknown> = {}): Promise<unknown> {
   const tool = ALL_TOOLS.find((t) => t.name === name);

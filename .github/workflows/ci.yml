@@ -24,7 +24,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r typecheck
 
-  sim-tests:
+  tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +38,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Determinism, evidence-integrity, correlation-contract, remediation, shapes
         run: pnpm --filter @incident-commander/sim test
+      # The 1.5K tool-response budget is a standing rule of this project, and this
+      # is the only thing that enforces it — asserted against synthetic worst-case
+      # inputs, not just today's scenario data. It was passing locally but was not
+      # in CI, which meant a regression in `shape.ts` could have merged unnoticed.
+      - name: Tool-response shape budget (1.5K cap)
+        run: pnpm --filter web test
 
   lighthouse:
     runs-on: ubuntu-latest

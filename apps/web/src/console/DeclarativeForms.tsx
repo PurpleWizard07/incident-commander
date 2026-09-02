@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { SERVICE_IDS } from "@incident-commander/shared";
 import { apiPost } from "../webmcp/apiClient.js";
 import { AgentIcon, PlusIcon } from "./icons.js";
 import { actionButton, fieldClass, selectClass } from "./ui.js";
-
-const SERVICE_OPTIONS = ["frontend", "checkout", "payments", "auth", "database", "queue", "notifications"];
 
 /**
  * Shared plumbing for both declarative-tool forms (plan §21.3): highlights while
@@ -190,7 +189,7 @@ export function CreateIncidentForm({ onSubmitted }: { onSubmitted: (incidentId: 
           size={3}
           className={fieldClass("h-[62px] flex-1 cursor-pointer py-1 text-[10.5px] [&>option:checked]:bg-ic-panel-3 [&>option]:px-1 [&>option]:py-[1px]")}
         >
-          {SERVICE_OPTIONS.map((s) => (
+          {SERVICE_IDS.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>

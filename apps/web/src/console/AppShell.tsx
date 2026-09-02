@@ -64,7 +64,13 @@ function groundTone(severity: string | undefined, state: string | null): GroundT
  *    accidentally put away.
  */
 export function AppShell() {
-  const { data, refresh, switchScenario } = useConsoleData();
+  const records = useToolRecords();
+  // Plan §2.2's third poll tier: while a tool call is in flight the console
+  // polls at 750ms instead of 2s, so an action the agent takes shows up in the
+  // shared view close to when it lands rather than up to two seconds later.
+  // `useConsoleData` cannot read this itself — it sits below the provider.
+  const agentWorking = records.some((r) => r.settledAt === null);
+  const { data, refresh, switchScenario } = useConsoleData(agentWorking ? "activity" : undefined);
   const [section, setSection] = useState<Section>("incidents");
   // ── Whether the lane starts open ──
   //
@@ -84,7 +90,6 @@ export function AppShell() {
   //    lane is where this browser is told, plainly, that nothing can drive the
   //    console but the person sitting there.
   const [laneOpen, setLaneOpen] = useState(() => !hasAgentInterface());
-  const records = useToolRecords();
 
   const incidentId = data.incident?.id ?? null;
   const incidentState = data.incident?.state ?? null;

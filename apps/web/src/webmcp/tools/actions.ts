@@ -1,7 +1,5 @@
 import { apiPost } from "../apiClient.js";
-import { toolResult } from "./shared.js";
-
-const SERVICE_ENUM = ["frontend", "checkout", "payments", "auth", "database", "queue", "notifications"];
+import { SERVICE_ENUM, toolResult } from "./shared.js";
 
 interface ActionResult {
   effect: string;

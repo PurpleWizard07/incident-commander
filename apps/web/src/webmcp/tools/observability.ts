@@ -1,8 +1,7 @@
 import { apiGet } from "../apiClient.js";
 import { capText, pct, sanitizeUntrusted, wrapUntrusted } from "../shape.js";
-import { REASON_PROPERTY, toolResult } from "./shared.js";
+import { REASON_PROPERTY, SERVICE_ENUM, toolResult } from "./shared.js";
 
-const SERVICE_ENUM = ["frontend", "checkout", "payments", "auth", "database", "queue", "notifications"];
 const METRIC_ENUM = [
   "request_rate", "error_rate", "latency_p50", "latency_p95", "latency_p99",
   "cpu", "memory", "queue_depth", "db_pool_utilization", "db_pool_wait_ms",

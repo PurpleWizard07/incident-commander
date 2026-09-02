@@ -8,6 +8,7 @@ import {
   type CompareResponse,
 } from "../src/webmcp/tools/observability.js";
 import { capText } from "../src/webmcp/shape.js";
+import { SERVICE_IDS } from "@incident-commander/shared";
 
 const MAX_CHARS = 1500;
 const LONG_MESSAGE =
@@ -55,7 +56,7 @@ describe("1.5K response budget (plan §6.6) — synthetic worst-case inputs, not
   });
 
   it("caps compare_metrics regardless of how many service/metric pairs are present", () => {
-    const services = ["frontend", "checkout", "payments", "auth", "database", "queue", "notifications"];
+    const services = SERVICE_IDS;
     const metrics = [
       "request_rate", "error_rate", "latency_p50", "latency_p95", "latency_p99",
       "cpu", "memory", "queue_depth", "db_pool_utilization", "db_pool_wait_ms",

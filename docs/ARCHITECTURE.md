@@ -19,8 +19,8 @@ bare `@incident-commander/*` specifier, for the same reason.
 ## `packages/sim` — the world is deterministic and has no opinion about HTTP
 
 A seeded PRNG (`prng.ts`) and virtual clock (`clock.ts`) drive every generator —
-`generators/{metrics,logs,traces,deployments}.ts`. Five scenarios
-(`scenarios/inc-4821-*.ts` … `inc-4825-*.ts`) are pure data: a starting state, a set of
+`generators/{metrics,logs,traces,deployments}.ts`. Five scenarios (`scenarios/hero-checkout.ts` for
+INC-4821, then `inc-4822-*.ts` … `inc-4825-*.ts`) are pure data: a starting state, a set of
 `groundTruth` correlations, and a remediation table. `world.ts` materializes a `(scenario, seed,
 nowMinute)` triple into the actual metric points, log lines, traces, deployments, changes, and
 alerts an incident-response console would show.
@@ -66,11 +66,13 @@ independently of what the client claims it registered.
 
 ## `apps/web` — the console and the tool surface
 
-`src/console/` is the React UI: `AppShell` (layout), `Topology` (hand-rolled SVG), `MetricsChart`
+`src/console/` is the React UI: `AppShell` (layout), `Surface` (the region/float/vitals primitives
+every screen is built from), `Masthead`, `Nav`, `Topology` (hand-rolled SVG), `MetricsChart`
 (Recharts + custom deploy-marker/onset overlays), `EvidenceTabs` (virtualized logs, trace
-waterfalls, deployment/change tables), `Timeline`, `AgentActivityRail`, `ApprovalCard`,
-`SupportingPages` (Services/Deployments/Alerts/Runbooks/Activity), `DeclarativeForms` (the two
-`<form toolname>` tools). `useConsoleData` drives the adaptive polling loop against `/api/state`.
+waterfalls, deployment/change tables), `Timeline`, `AgentLane` (the agent drawer and its collapsed
+rail), `ApprovalCard`, `SupportingPages` (Services/Deployments/Alerts/Runbooks/Activity),
+`DeclarativeForms` (the two `<form toolname>` tools). `useConsoleData` drives the adaptive polling
+loop against `/api/state` — four tiers, 5s idle down to 400ms while a remediation is recovering.
 
 `src/webmcp/` is the WebMCP layer: `tools/*.ts` (one file per tool group, each fetching the API and
 reshaping the response — see `shape.ts`'s response-cap discipline, below), `registerTools.ts`
@@ -105,5 +107,8 @@ once a function actually executes.
 `packages/sim/test/` — 46 tests: determinism (including the prefix-stability property above),
 evidence integrity (no leaked ground truth), the correlation contract (a cause must precede its
 effect; the decoy in INC-4822 postdates its symptoms), remediation outcomes, and phase shapes.
+`apps/web/test/` — 5 tests holding the 1.5K response cap above against synthetic worst-case inputs.
+Both suites, plus `pnpm -r typecheck` and a live Lighthouse run against production, are what CI
+runs on every push (`.github/workflows/ci.yml`).
 `evals/` is a separate, larger-scale verification layer — real Claude subagents investigating the
 live production API — described in `evals/RESULTS.md` and `docs/WEBMCP.md`.

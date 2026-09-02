@@ -18,9 +18,11 @@ name` if the same name is registered both ways, so these two are never in the im
 found empirically while building, not assumed from the spec text (see `phase-summary.md`'s Phase 7
 decisions log).
 
-Every read-only tool carries `readOnlyHint: true`; `query_logs`, `search_traces`, and `get_incident`
-also carry `untrustedContentHint: true` because their responses can contain human- or
-system-authored free text (see `docs/SECURITY.md`).
+Every read-only tool carries `readOnlyHint: true`. Four also carry `untrustedContentHint: true`,
+because their responses can contain free text this system did not author: `query_logs` and
+`search_traces` (log messages, span error messages), `get_incident` (operator and agent notes), and
+`get_pending_approvals` (the requesting agent's own stated reason and evidence). See
+`docs/SECURITY.md`.
 
 ## Why declarative forms for these two, and not the rest
 

@@ -16,16 +16,25 @@ import {
 import type { Deployment, Change, LogEntry, Trace } from "@incident-commander/shared";
 
 /**
- * Poll cadence from plan §2.2. "accelerated" now fires automatically while
- * the incident is `RECOVERING` (Phase 6's executed-remediation window) — the
- * real recovery is happening server-side over a handful of real seconds
- * (see store/session.ts), and fast polling is what makes the metrics chart
- * visibly animate as it happens. "activity" (tool call in flight) is left as
- * a caller-supplied override rather than wired to tool-call state here,
- * since that would require this hook to read the ToolActivityContext, which
- * lives above it in the tree (see AppShell) — a reasonable simplification,
- * not a correctness gap: RECOVERING is the window that actually needs fast
- * polling to look right.
+ * Poll cadence from plan §2.2, all four tiers live:
+ *
+ *   idle 5s · incidentOpen 2s · activity 750ms · accelerated 400ms
+ *
+ * "accelerated" fires automatically while the incident is `RECOVERING`
+ * (Phase 6's executed-remediation window) — the real recovery happens
+ * server-side over a handful of real seconds (see store/session.ts), and fast
+ * polling is what makes the metrics chart visibly animate as it happens.
+ *
+ * "activity" (a tool call in flight) has to come from the caller: this hook
+ * sits BELOW `ToolActivityProvider` in the tree, so it cannot read tool-call
+ * state itself. `AppShell` already subscribes to those records and passes the
+ * tier down.
+ *
+ * The override is read through a ref, not a dependency. Putting it in the
+ * effect's dep array would tear down and rebuild the whole polling loop on
+ * every start/settle transition — and, worse, re-run the `?scenario=` bootstrap
+ * at the bottom of the effect, which calls `switchScenario` and would reset the
+ * simulated world out from under the agent on its own first tool call.
  */
 export type PollTier = "idle" | "incidentOpen" | "activity" | "accelerated";
 const POLL_INTERVAL_MS: Record<PollTier, number> = {
@@ -89,6 +98,9 @@ export interface ConsoleDataHandle {
 export function useConsoleData(pollTierOverride?: PollTier): ConsoleDataHandle {
   const [data, setData] = useState<ConsoleData>(EMPTY);
   const seqRef = useRef(0);
+  // Deliberately a ref, not a dep — see this hook's doc comment.
+  const overrideRef = useRef(pollTierOverride);
+  overrideRef.current = pollTierOverride;
   const nowMinuteRef = useRef<number | null>(null);
   const hasIncidentRef = useRef(false);
   const incidentStateRef = useRef<string | null>(null);
@@ -156,8 +168,9 @@ export function useConsoleData(pollTierOverride?: PollTier): ConsoleDataHandle {
       } finally {
         if (!cancelled) {
           const tier: PollTier =
-            pollTierOverride ??
-            (incidentStateRef.current === "RECOVERING" ? "accelerated" : hasIncidentRef.current ? "incidentOpen" : "idle");
+            incidentStateRef.current === "RECOVERING"
+              ? "accelerated"
+              : (overrideRef.current ?? (hasIncidentRef.current ? "incidentOpen" : "idle"));
           timer = setTimeout(tick, POLL_INTERVAL_MS[tier]);
         }
       }
@@ -196,7 +209,7 @@ export function useConsoleData(pollTierOverride?: PollTier): ConsoleDataHandle {
       if (timer) clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pollTierOverride]);
+  }, []);
 
   return {
     data,

@@ -7,7 +7,7 @@ const KNOWN_SCENARIO_IDS: ScenarioId[] = ["INC-4821", "INC-4822", "INC-4823", "I
 function scenarioExists(id: string): id is ScenarioId {
   if (!(KNOWN_SCENARIO_IDS as string[]).includes(id)) return false;
   try {
-    getScenario(id as ScenarioId); // throws for a known-but-unimplemented id (Phase 8 fills these in)
+    getScenario(id as ScenarioId); // all five are implemented; this stays as the guard against a listed-but-missing id
     return true;
   } catch {
     return false;

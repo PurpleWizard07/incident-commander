@@ -1,8 +1,6 @@
 import { apiGet } from "../apiClient.js";
 import { capText, pct } from "../shape.js";
-import { REASON_PROPERTY, toolResult } from "./shared.js";
-
-const SERVICE_ENUM = ["frontend", "checkout", "payments", "auth", "database", "queue", "notifications"];
+import { REASON_PROPERTY, SERVICE_ENUM, toolResult } from "./shared.js";
 
 interface ServiceHealth {
   service: string;
