@@ -41,5 +41,7 @@ static assets are served here, so these are absolute links rather than site-rela
 - [docs/SECURITY.md](https://github.com/PurpleWizard07/incident-commander/blob/main/docs/SECURITY.md):
   the authorization model, including the seeded prompt-injection line in INC-4822's logs and why it
   changes nothing.
+- [docs/SPEC-FEEDBACK.md](https://github.com/PurpleWizard07/incident-commander/blob/main/docs/SPEC-FEEDBACK.md):
+  what building this taught us about WebMCP — four missing primitives and two implementation edges.
 - [evals/RESULTS.md](https://github.com/PurpleWizard07/incident-commander/blob/main/evals/RESULTS.md):
   the eval suite, the tuned-vs-naive tool-description ablation, and what was not measured.

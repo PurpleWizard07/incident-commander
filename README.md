@@ -447,10 +447,23 @@ The simulated world is deterministic, while mutations and incident events are pe
 - React
 - Vite
 - Tailwind CSS
-- Fastify
 - Recharts
-- Netlify
+- react-window
+- Vitest
+- Netlify Functions
 - Netlify Blobs
+
+There is deliberately no long-lived server process, no SQLite, and no SSE. A Netlify Function is a fresh invocation every time, so state is event-sourced onto Netlify Blobs and the console polls adaptively instead of holding a stream open.
+
+---
+
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - the workspace, the deterministic simulator, the event-sourced backend, and the 1.5K tool-response cap.
+- [docs/WEBMCP.md](docs/WEBMCP.md) - the tool surface in detail: dynamic registration, the two declarative forms, and why `reason` is required on every read-only tool.
+- [docs/SECURITY.md](docs/SECURITY.md) - the authorization model, why an agent cannot approve its own request, and what that does and does not rule out.
+- [docs/SPEC-FEEDBACK.md](docs/SPEC-FEEDBACK.md) - six things building this taught us about WebMCP, including two that cost real debugging time.
+- [evals/RESULTS.md](evals/RESULTS.md) - real agents investigating the live API, a tuned-vs-naive tool-description ablation, and what was not measured.
 
 ---
 
