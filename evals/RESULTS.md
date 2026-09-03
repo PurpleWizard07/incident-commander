@@ -5,7 +5,8 @@ subagent — no system prompt beyond the tool documentation and task framing sho
 `evals/prompt.mjs`).
 
 **Method:** real subagents investigating the live production API
-(`https://incident-commander-461.netlify.app`), not a canned trace. Each session called
+(`https://incident-commander-461.netlify.app` — the origin the project was served from at the time;
+it was later renamed and now lives at `https://firebro.netlify.app`), not a canned trace. Each session called
 `node evals/invoke.mjs <sessionId> <toolName> '<jsonArgs>'` from the repo root for every tool use;
 `invoke.mjs` makes the real HTTP call and mechanically appends `{at, tool, args, ok, result|error}`
 to `evals/traces/<sessionId>.jsonl` independent of what the agent later claims it did. Grading

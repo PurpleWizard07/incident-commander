@@ -3,7 +3,7 @@
 // (no build step) so the eval runner and `invoke.mjs` can both `import` it
 // directly with plain Node, no bundler involved. Plan §14.4 / §21.4.
 
-const BASE_URL = process.env.IC_BASE_URL || "https://incident-commander-461.netlify.app";
+const BASE_URL = process.env.IC_BASE_URL || "https://firebro.netlify.app";
 
 async function apiGet(path, query, sessionId) {
   const url = new URL(path, BASE_URL);

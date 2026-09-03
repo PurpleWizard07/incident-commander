@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  PRODUCTION_URL: https://incident-commander-461.netlify.app
+  PRODUCTION_URL: https://firebro.netlify.app
 
 jobs:
   typecheck:
