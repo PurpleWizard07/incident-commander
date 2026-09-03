@@ -1,127 +1,520 @@
-# Incident Commander
+# Firebro
 
-[![CI](https://github.com/PurpleWizard07/incident-commander/actions/workflows/ci.yml/badge.svg)](https://github.com/PurpleWizard07/incident-commander/actions/workflows/ci.yml)
+**An incident response console where AI agents investigate production failures and humans stay in control of remediation.**
 
-**Live:** https://incident-commander-461.netlify.app
+Firebro is a simulated incident-response workspace built for WebMCP.
 
-A production incident-response console where an AI agent investigates through structured WebMCP
-tools while the human responder watches the same evidence in the same interface, and retains sole
-authority to change production. Built for the WebMCP Challenge.
+It looks and works like an operational console: incidents, service health, dependencies, deployments, metrics, logs, traces, alerts, runbooks, timelines, and remediation controls.
+
+The difference is that an agent can operate that same workspace through WebMCP.
+
+The agent can investigate an outage, correlate evidence, propose a remediation, and follow the incident through recovery. Consequential actions can require explicit human approval before they are executed.
+
+**Agent capability, human authority.**
+
+> Firebro uses deterministic simulated infrastructure. It does not connect to or modify real production systems.
+
+---
+
+## The problem
+
+During an incident, the answer is rarely sitting on one screen.
+
+An engineer may need to check:
+
+- which services are unhealthy
+- recent deployments
+- dependency failures
+- logs
+- traces
+- metric changes
+- alerts
+- recent configuration changes
+- runbooks
+- the incident timeline
+
+Then they still have to decide whether the evidence is strong enough to take action.
+
+An AI agent is well suited to the investigation part of this workflow because it can move through structured evidence quickly.
+
+But incident response is also a bad place for unrestricted automation.
+
+A wrong rollback, restart, scale operation, or configuration change can make an outage worse.
+
+Firebro explores the middle ground: **let the agent investigate deeply, but keep consequential decisions under human control.**
+
+---
+
+## Why this is a strong fit for WebMCP
+
+A remote MCP server could expose an observability API.
+
+That is not quite what Firebro is trying to do.
+
+The important context already exists inside the incident console the operator has open:
+
+- which incident is selected
+- what service is being inspected
+- what stage the incident is in
+- which evidence is currently visible
+- whether an approval is pending
+- which actions are valid right now
+
+WebMCP lets the agent work inside that same application context.
+
+When the agent inspects something, Firebro can reflect that investigation in the normal UI. When it proposes a consequential action, the approval can appear next to the graphs, logs, traces, and deployment information supporting that decision.
+
+The human and agent are not operating two separate systems.
+
+They are working from the same incident.
+
+---
+
+## What the agent can do
+
+Firebro exposes WebMCP tools across the full incident-response workflow.
+
+### Investigation
+
+The agent can inspect:
+
+- active incidents
+- incident details
+- service health
+- service dependencies
+- recent deployments
+- recent changes
+- logs
+- traces
+- metric comparisons
+- alerts
+- runbooks
+- incident timelines
+
+### Incident management
+
+The agent can also:
+
+- create an incident
+- assign an incident
+- add incident notes
+- inspect pending approvals
+- request approval for a remediation
+- resolve an incident after recovery has been verified
+
+### Remediation
+
+Depending on the incident, available actions can include:
+
+- rolling back a deployment
+- restarting a service
+- scaling a service
+- disabling a feature flag
+
+Not every action is appropriate for every incident.
+
+That is intentional.
+
+---
+
+## What people and agents can do together
+
+The main Firebro workflow looks like this:
+
+```text
+Observe
+  ↓
+Investigate
+  ↓
+Correlate evidence
+  ↓
+Diagnose
+  ↓
+Propose remediation
+  ↓
+Human approval
+  ↓
+Remediate
+  ↓
+Verify recovery
+```
+
+The agent handles the expensive investigation work.
+
+The human keeps authority over actions that can affect production.
+
+For example, an agent may find that checkout latency started immediately after a deployment, confirm that traces point to the same service, compare metrics before and after the change, and propose a rollback.
+
+Firebro can then present that rollback for human approval beside the evidence supporting it.
+
+Only after the operator approves the specific action can remediation continue.
+
+This is different from having an assistant summarize an incident in chat. The agent is participating in the operational workflow itself.
+
+---
+
+## Shared context
+
+One of the main goals of Firebro was to avoid building a separate interface just for the agent.
+
+The WebMCP tools operate on the same application state used by the console.
+
+Agent investigations can produce visible effects in the UI:
+
+- a service can be focused in the topology
+- dependencies can be highlighted
+- logs can move to the relevant evidence
+- traces can be surfaced
+- metric comparisons can become visible
+- runbook steps can be highlighted
+- approval requests can appear inside the incident workflow
+
+This gives the operator a way to see what the agent is doing without exposing or depending on hidden chain-of-thought.
+
+The console shows observable actions, evidence, and results.
+
+---
+
+## Human approval
+
+Firebro deliberately does not treat approval as a simple boolean.
+
+A consequential action is tied to the exact remediation being requested.
+
+For example, approving:
+
+```text
+rollback deployment checkout-v3
+```
+
+should not authorize:
+
+```text
+restart payments
+```
+
+or any other action.
+
+Approvals are action-specific, single-use, and enforced by the backend rather than trusted to the agent or frontend alone.
+
+The agent can request approval.
+
+The human provides it.
+
+---
+
+## The incident simulator
+
+Firebro does not use a static set of screenshots pretending to be an outage.
+
+It runs a deterministic incident simulation.
+
+Each scenario has an underlying cause and a set of observable signals:
+
+- metrics change over time
+- logs are generated
+- traces reflect degraded dependencies
+- alerts fire
+- deployments and configuration changes appear in history
+- remediation changes what happens next
+
+The underlying ground truth is intentionally **not exposed through the WebMCP tools**.
+
+The agent has to diagnose the incident from observable evidence.
+
+The deterministic environment makes those workflows reproducible enough to evaluate.
+
+---
+
+## Incident scenarios
+
+Firebro includes five incident scenarios with different failure modes.
+
+### 1. Checkout degradation
+
+A bad checkout deployment causes latency and errors.
+
+There are other unhealthy-looking services in the environment, so the newest or loudest signal is not automatically the correct answer.
+
+A rollback is the effective remediation.
+
+### 2. Platform-wide latency
+
+Database connection-pool exhaustion causes latency across multiple services.
+
+A recent payments deployment acts as a plausible distraction.
+
+The correct response is to address the resource bottleneck rather than blindly rolling back the latest deployment.
+
+### 3. Pricing errors
+
+Checkout begins returning incorrect prices even though there was no relevant recent deployment.
+
+The cause is a feature flag.
+
+The appropriate remediation is to disable the flag.
+
+### 4. Notification backlog
+
+A notification service develops a memory problem and begins failing.
+
+Restarting it may help temporarily without fixing the underlying problem.
+
+This scenario tests whether the agent verifies recovery instead of immediately declaring the incident resolved.
+
+### 5. Payment provider failure
+
+The source of the incident is an external provider.
+
+Making unnecessary internal changes can be worse than waiting or using an available fallback.
+
+Sometimes the correct operational action is **not to change anything**.
+
+---
+
+## Why multiple scenarios matter
+
+If every incident were solved by:
+
+> find latest deployment → rollback
+
+then the agent would not actually be doing incident response.
+
+Firebro includes plausible distractions, partial remediations, ineffective actions, and cases where intervention is unnecessary.
+
+The goal is to test whether the agent can correlate evidence and respond to what actually happened.
+
+---
+
+## Incident lifecycle
+
+Incidents move through an explicit lifecycle:
+
+```text
+TRIGGERED
+   ↓
+OPEN
+   ↓
+INVESTIGATING
+   ↓
+DIAGNOSIS_FOUND
+   ↓
+REMEDIATION_PROPOSED
+   ↓
+WAITING_FOR_APPROVAL
+   ↓
+MITIGATING
+   ↓
+RECOVERING
+   ↓
+MONITORING
+   ↓
+RESOLVED
+```
+
+Recovery is not assumed just because a remediation tool returned successfully.
+
+If an action has no effect or makes the incident worse, the workflow can move backward and investigation continues.
+
+---
+
+## WebMCP implementation
+
+Firebro exposes a broad set of meaningful WebMCP capabilities instead of a collection of low-level UI click tools.
+
+The tool surface covers investigation, incident management, remediation, approvals, and recovery.
+
+Tool availability can change based on application context such as:
+
+- the currently selected incident
+- the incident lifecycle state
+- the operator's role
+- whether an approval is pending
+- whether a remediation is currently valid
+
+This keeps the tool surface closer to the actions that make sense in the current state instead of exposing every capability all the time.
+
+Tool descriptions also include guidance about when a capability should and should not be used.
+
+Read-heavy tools return shaped evidence rather than dumping large quantities of raw telemetry into the agent context.
+
+For example, log and metric tools can return relevant windows, summaries, evidence references, and explicit empty results instead of thousands of unfiltered records.
+
+---
+
+## WebMCP tool groups
+
+### Investigation
+
+Examples include:
+
+- `get_active_incidents`
+- `get_incident`
+- `get_service_health`
+- `get_service_dependencies`
+- `get_recent_deployments`
+- `get_recent_changes`
+- `query_logs`
+- `search_traces`
+- `compare_metrics`
+- `inspect_alert`
+- `get_runbook`
+- `get_incident_timeline`
+
+### Actions
+
+Examples include:
+
+- `create_incident`
+- `assign_incident`
+- `add_incident_note`
+- `rollback_deployment`
+- `restart_service`
+- `scale_service`
+- `disable_feature_flag`
+- `resolve_incident`
+
+### Approval workflow
+
+Examples include:
+
+- `get_pending_approvals`
+- `request_approval`
+- `record_approval`
+- `record_rejection`
+
+The goal is not to maximize the number of tools.
+
+The goal is to expose the incident-response workflow at the right semantic level.
+
+---
+
+## Untrusted operational data
+
+Logs, alerts, traces, and other observability data are treated as untrusted input.
+
+A production log line should not become an instruction simply because an agent can read it.
+
+Firebro separates operational evidence from instructions and keeps consequential actions behind the approval boundary.
+
+One simulated scenario can include adversarial text inside telemetry specifically to test that boundary.
+
+---
+
+## Architecture
+
+At a high level:
+
+```text
+Human operator
+      │
+      ▼
+Firebro incident console
+      │
+      ├── WebMCP capability layer
+      │         │
+      │         ▼
+      │   Agent investigation
+      │
+      ├── Approval workflow
+      │
+      ▼
+Application API
+      │
+      ├── authorization
+      ├── action validation
+      └── approval validation
+      │
+      ▼
+Deterministic incident simulator
+      │
+      ├── service state
+      ├── deployments
+      ├── metrics
+      ├── logs
+      ├── traces
+      └── incident events
+```
+
+The simulated world is deterministic, while mutations and incident events are persisted so browser state, WebMCP tools, and the console stay synchronized.
+
+---
+
+## Built with
+
+- WebMCP
+- TypeScript
+- React
+- Vite
+- Tailwind CSS
+- Fastify
+- Recharts
+- Netlify
+- Netlify Blobs
+
+---
+
+## Testing and evaluation
+
+Firebro is designed to be tested as an agent-operated application, not only as a collection of individual functions.
+
+Testing covers:
+
+- deterministic simulation behavior
+- WebMCP tool contracts
+- incident state transitions
+- remediation outcomes
+- approval enforcement
+- evidence correlation
+- browser-level agent workflows
+- UI behavior after tool calls
+
+The goal is to verify more than whether a tool can be called successfully.
+
+A good run should show that the agent:
+
+1. gathers relevant evidence
+2. avoids jumping to the first plausible explanation
+3. proposes an appropriate remediation
+4. respects the approval boundary
+5. verifies recovery after the action
+
+---
 
 ## Try it
 
-### ChatGPT in-app browser (primary judge surface)
+Open the deployed Firebro application in a WebMCP-capable browser or ChatGPT's in-app browser.
 
-Open the live URL above inside ChatGPT's in-app browser. Ask it to investigate the open incident —
-it discovers and calls tools directly through `document.modelContext`.
+Start with the active checkout incident and ask:
 
-### Chrome, with the WebMCP flag
+> Investigate the active checkout incident. Find the most likely cause and show me the evidence before taking any remediation action.
 
-Enable `chrome://flags/#enable-webmcp-testing`, open the live URL. Chrome ships no built-in chat
-agent yet, so to execute a tool call manually (no LLM needed) use the [Model Context Tool
-Inspector](https://github.com/beaufortfrancois/model-context-tool-inspector) extension's **Execute
-Tool** action, or drive it from an actual agent (e.g. a Claude/GPT browser-automation session)
-pointed at the tab.
+Then ask:
 
-An **origin trial token** is registered and shipped (`apps/web/index.html`), covering Chrome
-149–156 — the trial runs through 2026-11-17. On a Chrome build inside that range, the token alone
-is enough; the flag above is the fallback for anyone outside it.
+> What would you do next?
 
-### Scenarios and seeds
+The important part is not whether the agent immediately guesses the root cause.
 
-Five incidents, selectable via query parameters — `?scenario=<id>&seed=<n>` — or the scenario
-picker in the header. Seed defaults to `42`; the simulation is fully deterministic per
-`(scenario, seed)`.
+Watch how it moves through the incident evidence, proposes an action, and reaches the approval boundary.
 
-| Scenario | Title | What a correct investigation finds |
-|---|---|---|
-| `INC-4821` | Checkout degradation | A bad deploy (`checkout-v3`) broke token validation; `payments`' errors are downstream fallout, not the cause |
-| `INC-4822` | Platform-wide latency | A reconciliation job exhausted the database connection pool; a fresh `payments-v7` deploy is a decoy that postdates the symptoms |
-| `INC-4823` | Checkout pricing errors | A feature-flag rollout, not a deploy, broke pricing — `get_recent_deployments` comes back empty on purpose |
-| `INC-4824` | Notification backlog | A runtime memory leak (GC pressure, OOM restarts), independent of any deploy or config change |
-| `INC-4825` | Payment provider failure | An external provider outage — the correct action is to route around it via a flag, or take no action at all; scaling/restarting our own service doesn't help |
+Approve the remediation from the Firebro console and continue monitoring the incident to verify recovery.
 
-`https://incident-commander-461.netlify.app/?scenario=INC-4821&seed=42` loads the hero incident
-directly.
+You can also try other incidents. They are intentionally designed so the same remediation strategy does not work every time.
 
-### Local development
+---
 
-```bash
-pnpm install
-netlify dev --filter @incident-commander/api -c "pnpm --filter web dev" --target-port 5173
-```
+## What Firebro is not
 
-(`netlify dev` needs Windows Developer Mode enabled if developing on Windows — a symlink-permission
-issue, not a code issue; Linux, including the actual deployed runtime, doesn't hit this.)
+Firebro is a hackathon project running against deterministic simulated infrastructure.
 
-## Why this is a WebMCP project and not a chat wrapper over an MCP server
+It is not a replacement for Datadog, Grafana, PagerDuty, or an existing production incident-management stack.
 
-A server-side MCP over a Datadog- or PagerDuty-shaped tool set would produce a chat transcript
-describing an incident — a reasonable thing to build, and not what makes this project specifically
-a WebMCP one. **The agent operates the same console the human is watching.** All 12 investigation
-tools have a specified visible effect in the UI — topology nodes pulse, the evidence panel
-auto-switches tabs and scrolls to the matching log line, the metrics chart bolds the series and
-marks the deploy that caused it, an overlay spotlights the runbook being read. The approval card the
-agent's `request_approval` call produces sits beside the graph that justifies it, the topology node
-that turned red, and the log line that proves it — in the same interface the responder is already
-looking at, at the moment of the decision. That shared context is only possible because the tool
-calls and the console rendering share an origin's DOM; a server MCP has no equivalent. Full argument
-and implementation in [`docs/WEBMCP.md`](docs/WEBMCP.md).
+The project is exploring a different question:
 
-**Human authority boundary:** WebMCP is the agent's interface, not the security boundary. Every one
-of the four production-changing tools (`rollback_deployment`, `restart_service`, `scale_service`,
-`disable_feature_flag`) requires an approval token that only a real, trusted click in the console
-can mint — an agent that calls `request_approval` and then tries to approve its own request is
-denied and the attempt is audited. Full model in [`docs/SECURITY.md`](docs/SECURITY.md).
+**What should an operational console look like when both humans and agents are first-class users of it?**
 
-## Tool surface
-
-21 imperative tools registered via `document.modelContext.registerTool()`, plus 2 declarative
-`<form toolname="…">` tools (`add_incident_note`, `create_incident`) — 23 distinct tools, all
-audited against a real use. The registered surface changes with application state (role, incident
-selection, incident state, approval presence) rather than being a static dump at page load. Every
-read-only tool requires a `reason` — one sentence on what the call is meant to establish — which the
-console renders live beside the call, so the human is reading an investigation rather than a list of
-tool names. Full breakdown in [`docs/WEBMCP.md`](docs/WEBMCP.md).
-
-## Verification — artifacts a judge can check, not just claims
-
-| | |
-|---|---|
-| **Lighthouse** | Agentic Browsing **4/4** checks passing; performance 0.99, accessibility 1.0, best-practices 1.0, SEO 1.0 (desktop preset, matching the judge environment; performance samples 0.98–0.99 run to run). Report: [`docs/lighthouse-report.report.html`](docs/lighthouse-report.report.html) · Screenshot: [`docs/lighthouse-scores.png`](docs/lighthouse-scores.png) |
-| **Eval suite** | 30 hand-written cases across all 5 scenarios, **58/60 passed (96.7%)**, including a tuned-vs-naive tool-description ablation. Full results and methodology, including the one genuine miss (a self-found, root-caused eval-suite gap, not a description-quality issue): [`evals/RESULTS.md`](evals/RESULTS.md) |
-| **CI** | Every push: typecheck across all 4 workspace packages, 46 simulation-engine tests (determinism, evidence integrity, correlation contract, remediation, phase shapes), and a live Lighthouse run against production. [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
-
-**On the eval methodology:** the eval numbers above come from a self-built harness — real Claude
-Sonnet 5 subagents calling tools against the live production API, with a mechanically-logged trace
-independent of the agent's self-report — rather than Chrome's `webmcp-tools` CLI eval runner (whose
-exact configuration wasn't fully specified against the actual repo at the time of writing). The
-ChatGPT-in-app-browser and Chrome-native paths above are verified **manually and qualitatively**,
-not quantitatively; conflating the two would overclaim, so they're reported separately.
-
-## Docs
-
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — monorepo layout, the deterministic simulation
-  engine, the event-sourced backend, why Netlify Blobs and polling instead of SQLite/SSE.
-- [`docs/WEBMCP.md`](docs/WEBMCP.md) — the tool surface, declarative forms, dynamic registration,
-  the shared-context argument in full.
-- [`docs/SECURITY.md`](docs/SECURITY.md) — the authorization layers, the self-approval denial, the
-  prompt-injection mitigations (including a seeded, inert injection attempt left in on purpose).
-- [`docs/SPEC-FEEDBACK.md`](docs/SPEC-FEEDBACK.md) — four real edges hit while building against
-  `document.modelContext`: progress reporting, output schemas, elicitation, multi-tool skills.
-- [`evals/RESULTS.md`](evals/RESULTS.md) — the eval suite and ablation, in full.
-
-## What we will not claim
-
-- This is a simulation. No real infrastructure, credentials, or production system is reachable
-  through it.
-- The authorization model here is what a real production deployment would need to build, not a
-  claim that agent authorization is a solved problem.
-- The Lighthouse fraction measures agentic readiness, not product quality.
-- Eval pass rates are model- and prompt-dependent. Ours are reported against one pinned model
-  (Claude Sonnet 5), named as such — see [`evals/RESULTS.md`](evals/RESULTS.md) for exactly what
-  was and wasn't measured quantitatively.
+---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT
