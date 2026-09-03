@@ -483,7 +483,11 @@ A good run should show that the agent:
 
 ## Try it
 
-Open the deployed Firebro application in a WebMCP-capable browser or ChatGPT's in-app browser.
+**Live: https://firebro.netlify.app**
+
+Open it in ChatGPT's in-app browser, or in Chrome. The origin is registered for the WebMCP origin
+trial, so **Chrome 149-156 needs no flag** - the tools register on page load. On any other browser,
+enable `chrome://flags/#enable-webmcp-testing`.
 
 Start with the active checkout incident and ask:
 

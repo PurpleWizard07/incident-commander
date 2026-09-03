@@ -30,13 +30,17 @@
       (2026-09-03) and implementation-plan.md §21.1. Chrome still also works via
       chrome://flags/#enable-webmcp-testing without this; ChatGPT's in-app browser needs neither.
 
-      CAVEAT (2026-09-03): this token carries isThirdParty:true, which is meant for a script
-      embedded on *other* sites — Chrome expects such tokens to be injected at runtime by that
-      script and validates them against the script's origin, so a third-party token sitting in a
-      static meta tag on a first-party page is expected to be REJECTED. If tools do not register
-      flag-free, re-register with "third-party matching" unchecked. isSubdomain:true is harmless.
+      Re-registered 2026-09-03 as a plain FIRST-PARTY token — payload is exactly
+      {"origin":"https://firebro.netlify.app:443","feature":"WebMCP","expiry":1794873600}, with no
+      isThirdParty and no isSubdomain. The previous token had both. isThirdParty:true is for a
+      script embedded on *other* sites: Chrome expects such a token to be injected at runtime by
+      that script and validates it against the script's origin, so it is rejected when it sits in a
+      static meta tag on a first-party page — which is what this is. Keep it first-party. Because
+      isSubdomain is now absent the token covers this exact host only, which is all that is
+      deployed; a Netlify deploy-preview URL (deploy-preview-N--firebro.netlify.app) is a different
+      origin and will need the flag.
     -->
-    <meta http-equiv="origin-trial" content="A7MvcyAhFRjksz9F1/1AoHdzpLLXKHwmFNGfWdarumYuLYRNtva3WYtfmkeLKOxisRh4Fw9A9zKYfLAyofxxqQ0AAAB6eyJvcmlnaW4iOiJodHRwczovL2ZpcmVicm8ubmV0bGlmeS5hcHA6NDQzIiwiZmVhdHVyZSI6IldlYk1DUCIsImV4cGlyeSI6MTc5NDg3MzYwMCwiaXNTdWJkb21haW4iOnRydWUsImlzVGhpcmRQYXJ0eSI6dHJ1ZX0=">
+    <meta http-equiv="origin-trial" content="Alq6exhiVSuHSKgaqyh2Ri2Ut0pZRzjkt4MvMuGJKJCL+9uYCOqCl4ePWn54aImniA6xfFtbWROO8pB6TurU7gIAAABTeyJvcmlnaW4iOiJodHRwczovL2ZpcmVicm8ubmV0bGlmeS5hcHA6NDQzIiwiZmVhdHVyZSI6IldlYk1DUCIsImV4cGlyeSI6MTc5NDg3MzYwMH0=">
 
   </head>
   <body>

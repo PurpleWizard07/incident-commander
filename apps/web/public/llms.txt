@@ -17,7 +17,7 @@
 - 2 declarative tools (`create_incident`, `add_incident_note`) exposed as `<form toolname="...">`
   elements — the agent fills the form, a human still presses Submit.
 - The registered tool surface changes live with the selected incident, the console's role
-  (`responder`/`approver`/`observer`), the incident's state, and whether an approval is pending.
+  (`responder`/`observer`), the incident's state, and whether an approval is pending.
   `observer` registers no action or approval tools at all.
 
 ## Scenarios
