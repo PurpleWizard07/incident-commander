@@ -3,7 +3,7 @@ import type { Incident } from "@incident-commander/shared";
 import { ChevronIcon, ClockIcon } from "./icons.js";
 import { badge, segment, selectClass, type BadgeTone } from "./ui.js";
 
-const ROLES = ["observer", "responder", "approver"];
+const ROLES = ["observer", "responder"];
 
 /**
  * The picker used to list bare ids. Five options reading `INC-4821` … `INC-4825`
@@ -111,19 +111,18 @@ export function SessionBar({
           <span className="ic-overline">Role</span>
           <div
             role="group"
-            aria-label="Responder role"
-            className="relative grid grid-cols-3 rounded-md border border-ic-border bg-ic-bg/60 p-[2px]"
+            aria-label="Session role"
+            className="relative grid grid-cols-2 rounded-md border border-ic-border bg-ic-bg/60 p-[2px]"
           >
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute inset-y-[2px] left-[2px] w-[calc((100%-4px)/3)] rounded-[4px] bg-ic-text transition-transform duration-250 ease-out"
+              className="pointer-events-none absolute inset-y-[2px] left-[2px] w-[calc((100%-4px)/2)] rounded-[4px] bg-ic-text transition-transform duration-250 ease-out"
               style={{ transform: `translateX(${roleIndex * 100}%)` }}
             />
-            {/* Full words, not `r.slice(0, 3)`. The old truncation rendered
-                approver as "app", which reads as "application" — a confusing
-                label on the one control that decides whether the agent may
-                touch production at all. The bar wraps now, so the extra width
-                costs nothing. */}
+            {/* Full words, not `r.slice(0, 3)` — truncation once rendered a
+                role as "app", which reads as "application", on the one control
+                that decides whether the agent may touch production at all. The
+                bar wraps now, so the extra width costs nothing. */}
             {ROLES.map((r) => (
               <button
                 key={r}

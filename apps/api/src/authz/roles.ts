@@ -1,12 +1,21 @@
 import type { Role } from "../sharedTypes.js";
 
 /**
- * Plan §8.1 only specifies one hard boundary at this layer: observer never
- * gets a mutating tool surface at all. It does not specify a stricter
- * responder-cannot-approve separation of duties, so this stays permissive
- * between responder/approver — both can mutate and both can decide approvals.
- * A stricter split is a Phase 6+ refinement if the demo wants to show one,
- * not something this phase's plan sections require.
+ * There is exactly one boundary at this layer, and it is plan §8.1's:
+ * `observer` never gets a mutating tool surface at all; `responder` has full
+ * authority.
+ *
+ * A third `approver` role existed until 2026-09-03 and was removed. It was
+ * indistinguishable from `responder` — both predicates below are
+ * `!== "observer"` — so the console offered a switch position that changed
+ * nothing while implying a separation of duties the code never enforced.
+ * The real boundary on approvals is not role-vs-role: it is the human
+ * gesture, since the decide endpoint requires an `isTrusted`-minted approval
+ * token an agent cannot forge (docs/SECURITY.md). A role named "approver"
+ * pointed attention away from that. See phase-summary.md's 2026-09-03 entry.
+ *
+ * The two predicates stay separate despite sharing a body: they answer
+ * different questions, and the call sites read correctly because of it.
  */
 export function canMutate(role: Role): boolean {
   return role !== "observer";

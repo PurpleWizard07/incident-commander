@@ -236,7 +236,7 @@ export interface Alert {
 
 // --- Session role (plan §7.1, §8.1, §13.2) ----------------------------------
 
-export type Role = "responder" | "approver" | "observer";
+export type Role = "responder" | "observer";
 
 // --- Runbook (plan §3.8) -----------------------------------------------------
 

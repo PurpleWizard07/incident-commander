@@ -177,9 +177,26 @@ function keyFor(sessionId: string): string {
  * still see the incident settle into MONITORING without ever triggering a
  * mutating call itself.
  */
+/**
+ * A session blob written before `approver` was retired (2026-09-03) still
+ * carries that value. Both authz gates read `!== "observer"`, so the server
+ * already behaves correctly, but the console's segmented switch would show no
+ * segment selected with its indicator parked under `observer` — the one
+ * control that looks like it governs production authority, reading as broken.
+ * Fold it into the live role it was always equivalent to.
+ *
+ * Applied transiently on every read rather than migrated, for the same reason
+ * the clock is (see above): it's a pure function of what's in storage, so it's
+ * always right without spending a Blob write. `setRole` is the only path that
+ * persists a role, and it can no longer persist this one.
+ */
+function normalizeRole(session: SessionState): SessionState {
+  return (session.role as string) === "approver" ? { ...session, role: "responder" } : session;
+}
+
 export async function loadSession(sessionId: string): Promise<SessionState> {
   const existing = await readJSON<SessionState>(keyFor(sessionId));
-  const session = existing ?? bootstrapSession(sessionId);
+  const session = normalizeRole(existing ?? bootstrapSession(sessionId));
   const withState = reconcileIncidentState(session);
   if (withState === session) return withResolvedClock(session);
 
@@ -204,7 +221,7 @@ export async function withSession<R>(
   mutate: (state: SessionState) => { next: SessionState; result: R }
 ): Promise<R> {
   return readModifyWrite(keyFor(sessionId), () => bootstrapSession(sessionId), (current) =>
-    mutate(withResolvedClock(reconcileIncidentState(current)))
+    mutate(withResolvedClock(reconcileIncidentState(normalizeRole(current))))
   );
 }
 

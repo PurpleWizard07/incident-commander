@@ -1,7 +1,7 @@
 import type { Role } from "../sharedTypes.js";
 import type { SessionState } from "../store/session.js";
 
-const VALID_ROLES: Role[] = ["responder", "approver", "observer"];
+const VALID_ROLES: Role[] = ["responder", "observer"];
 
 export function setRole(session: SessionState, role: string | undefined): { session: SessionState; response: { status: number; body: unknown } } {
   if (!role || !VALID_ROLES.includes(role as Role)) {
