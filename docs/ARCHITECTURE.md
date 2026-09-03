@@ -159,6 +159,11 @@ agentic-browsing all **1.0**, with `webmcp-registered-tools`, `webmcp-schema-val
 `agent-accessibility-tree` and `llms-txt` each passing. `lighthouse-scores.png` is the score strip
 from that report and `lighthouse-final-screenshot.png` is the console itself on production.
 
+Only the two gated categories are guaranteed. **Performance floats between 0.98 and 1.0 across
+runs** — it is a live network measurement of a real deployment, so it moves with the runner, and a
+local run on a home connection scores lower still. The committed report is one honest run, not a
+best-of; treat the two gates as the standing claim and performance as consistently very good.
+
 `evals/` is a separate, larger-scale verification layer — real Claude subagents investigating the
 live production API — described in [`evals/RESULTS.md`](../evals/RESULTS.md) and
 [`WEBMCP.md`](WEBMCP.md).
