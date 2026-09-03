@@ -71,7 +71,7 @@ export function SessionBar({
        measured at 390px, taking the whole sheet with them. */
     <header className="relative z-10 flex min-h-[52px] shrink-0 flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-ic-border px-5 py-1.5">
       <div className="flex min-w-0 items-baseline gap-3">
-        <span className="ic-overline text-ic-text-dim">Incident Commander</span>
+        <span className="ic-overline text-ic-text-dim">Firebro</span>
         <span aria-hidden="true" className="h-3 w-px bg-ic-border-strong" />
         <span className="truncate text-[12.5px] font-medium tracking-[-0.01em] text-ic-text">{sectionLabel}</span>
       </div>

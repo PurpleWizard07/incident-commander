@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Incident Commander: a WebMCP-native production incident-response console where an AI agent investigates through structured tools while a human retains authority over production changes."
+      content="Firebro: a WebMCP-native production incident-response console where an AI agent investigates through structured tools while a human retains authority over production changes."
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <!--
@@ -23,14 +23,20 @@
     <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/instrument-sans-latin-var.woff2" />
     <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/ibm-plex-mono-latin-400.woff2" />
     <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/ibm-plex-mono-latin-500.woff2" />
-    <title>Incident Commander</title>
+    <title>Firebro</title>
     <!--
-      WebMCP origin trial token, scoped to https://incident-commander-461.netlify.app, expires
-      2026-11-17. Registered at https://developers.chrome.com/origintrials — see phase-summary.md
-      decisions log (2026-08-31) and implementation-plan.md §21.1. Chrome still also works via
+      WebMCP origin trial token, scoped to https://firebro.netlify.app, expires 2026-11-17.
+      Registered at https://developers.chrome.com/origintrials — see phase-summary.md decisions log
+      (2026-09-03) and implementation-plan.md §21.1. Chrome still also works via
       chrome://flags/#enable-webmcp-testing without this; ChatGPT's in-app browser needs neither.
+
+      CAVEAT (2026-09-03): this token carries isThirdParty:true, which is meant for a script
+      embedded on *other* sites — Chrome expects such tokens to be injected at runtime by that
+      script and validates them against the script's origin, so a third-party token sitting in a
+      static meta tag on a first-party page is expected to be REJECTED. If tools do not register
+      flag-free, re-register with "third-party matching" unchecked. isSubdomain:true is harmless.
     -->
-    <meta http-equiv="origin-trial" content="Ah6WDT2gVBUqaL55gl4OFyC676JcxARyN8nl0otDAYTdBvM80cMrY7IR5OEE56kEJf+gsx6Hq/2Hq1zmoeJUtgIAAABieyJvcmlnaW4iOiJodHRwczovL2luY2lkZW50LWNvbW1hbmRlci00NjEubmV0bGlmeS5hcHA6NDQzIiwiZmVhdHVyZSI6IldlYk1DUCIsImV4cGlyeSI6MTc5NDg3MzYwMH0=">
+    <meta http-equiv="origin-trial" content="A7MvcyAhFRjksz9F1/1AoHdzpLLXKHwmFNGfWdarumYuLYRNtva3WYtfmkeLKOxisRh4Fw9A9zKYfLAyofxxqQ0AAAB6eyJvcmlnaW4iOiJodHRwczovL2ZpcmVicm8ubmV0bGlmeS5hcHA6NDQzIiwiZmVhdHVyZSI6IldlYk1DUCIsImV4cGlyeSI6MTc5NDg3MzYwMCwiaXNTdWJkb21haW4iOnRydWUsImlzVGhpcmRQYXJ0eSI6dHJ1ZX0=">
 
   </head>
   <body>

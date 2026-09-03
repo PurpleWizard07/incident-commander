@@ -1,4 +1,4 @@
-# Incident Commander
+# Firebro
 
 > A WebMCP-native production incident-response console. An AI agent investigates a live incident
 > through structured, imperative and declarative WebMCP tools — service health, deployments, logs,
