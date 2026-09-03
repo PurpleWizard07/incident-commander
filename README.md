@@ -246,7 +246,7 @@ A recent payments deployment acts as a plausible distraction.
 
 The correct response is to address the resource bottleneck rather than blindly rolling back the latest deployment.
 
-### 3. Pricing errors
+### 3. Checkout pricing errors
 
 Checkout begins returning incorrect prices even though there was no relevant recent deployment.
 
@@ -381,7 +381,8 @@ Examples include:
 - `get_pending_approvals`
 - `request_approval`
 - `record_approval`
-- `record_rejection`
+
+A rejection is not a separate tool. `record_approval` takes a `decision` of `approved` or `rejected`, and either way it requires the human-only approval token, so an agent cannot record a decision of its own in either direction.
 
 The goal is not to maximize the number of tools.
 
