@@ -12,6 +12,12 @@
 | Declarative-only (2) | `add_incident_note`, `create_incident` — see below |
 | Human-control (3) | `get_pending_approvals`, `request_approval`, `record_approval` |
 
+That 23 is the **catalogue** — every distinct name that can be registered. The surface live at any
+one moment is smaller, because registration tracks application state (see *Dynamic registration*).
+On production today, a `responder` looking at an open incident with nothing awaiting a decision sees
+**22**: the 20 imperative tools that context calls for, plus the 2 declarative forms.
+`record_approval` is the 21st, and it appears only once an approval is actually pending.
+
 `add_incident_note` and `create_incident` are declared as `<form toolname="…">` elements, not
 `registerTool()` calls. Chrome's real implementation throws `InvalidStateError: Duplicate tool
 name` if the same name is registered both ways, so these two are never in the imperative list —
@@ -22,7 +28,21 @@ Every read-only tool carries `readOnlyHint: true`. Four also carry `untrustedCon
 because their responses can contain free text this system did not author: `query_logs` and
 `search_traces` (log messages, span error messages), `get_incident` (operator and agent notes), and
 `get_pending_approvals` (the requesting agent's own stated reason and evidence). See
-`docs/SECURITY.md`.
+[`SECURITY.md`](SECURITY.md).
+
+## Getting the tools to appear
+
+The page carries a first-party **WebMCP origin trial token** for `https://firebro.netlify.app`, so
+on Chrome 149–156 the tools register on page load with **no flag and no setup** — verified in real
+Chrome 152, headless, no flags. ChatGPT's in-app browser needs nothing either. Any other browser
+needs `chrome://flags/#enable-webmcp-testing`, and the console says so once in the agent lane rather
+than silently presenting a lane that never fills.
+
+One caveat worth knowing if you deploy this yourself: the token is bound to that exact origin and
+carries no `isSubdomain`, so a Netlify **deploy-preview** URL is a different origin and still needs
+the flag. Always check flag-free behaviour against production. (An earlier token set
+`isThirdParty: true` and was silently rejected in a static `<meta>` tag — see
+[`SPEC-FEEDBACK.md`](SPEC-FEEDBACK.md) §5.)
 
 ## `reason` is a required parameter on every read-only tool
 
@@ -54,66 +74,101 @@ what the agent is about to write before it lands. Every other action (rollback, 
 disable-flag) stays imperative — the approval flow, not the form itself, is what a human should be
 watching there.
 
-```html
-<form toolname="add_incident_note"
+```tsx
+// apps/web/src/console/DeclarativeForms.tsx
+<form ref={ref} onSubmit={handleSubmit}
+      toolname="add_incident_note"
       tooldescription="Append a timestamped note to an incident timeline. Use to record
                        findings, uncertainty, and any action that mitigates a symptom
-                       without fixing the cause."
-      id="note-form">
-  <input type="hidden" name="incidentId" toolparamdescription="Incident id, e.g. INC-4821">
-  <textarea name="note"
-            toolparamdescription="Plain text. State findings and uncertainty explicitly."></textarea>
+                       without fixing the underlying cause.">
+  <input type="hidden" name="incidentId" value={incidentId} />
+  <AgentFillingBanner visible={agentFilling} />
+  <textarea name="note" required aria-label="Note"
+            toolparamdescription="Plain text. State findings and uncertainty explicitly." />
   <button type="submit">Add note</button>
 </form>
 ```
 
-```js
-noteForm.addEventListener('submit', async (e) => {
-  const result = await saveNote(new FormData(e.target));
-  if (e.agentInvoked) e.respondWith(Promise.resolve(result.summary));
-});
-noteForm.addEventListener('toolactivated', () => scrollNoteIntoView());
+Two things are wired to the DOM directly rather than through React props, because they're real
+browser events on the form element:
+
+```ts
+form.addEventListener("toolactivated", () => setAgentFilling(true));
+form.addEventListener("toolcancel", () => setAgentFilling(false));
+
+// …and in the submit handler, answer the agent only when the agent is the one submitting:
+const submitEvent = e.nativeEvent as SubmitEvent;
+const actorKind = submitEvent.agentInvoked ? "agent" : "human";
+if (submitEvent.agentInvoked) submitEvent.respondWith?.(Promise.resolve(summary));
 ```
 
-An agent-driven submission is styled via `:tool-form-active` so a human watching the console can
-tell the form is being filled by the agent, not by them. `toolautosubmit` is deliberately **not**
-set — a human still has to see the drafted content land before it becomes part of the record.
+`agentInvoked` also decides what goes in the audit log and on the timeline, so a note the agent
+wrote and a note a human typed are distinguishable after the fact, not just while it happens.
+
+"The agent is typing in this form right now" is the most interesting state declarative WebMCP has,
+so it is said twice, deliberately: `AgentFillingBanner` is a labelled bar in the agent's blue above
+the fields, and the browser's own `:tool-form-active` pseudo-class outlines the form
+(`index.css`). A browser without declarative WebMCP simply never matches the pseudo-class — a no-op,
+not a broken style. `toolautosubmit` is deliberately **not** set: the agent fills the fields, a
+human still presses Submit and sees the content before it lands.
 
 ## Dynamic registration
 
 Tools are registered and unregistered as application state changes, one `AbortController` per
-registration "generation," rather than dumped statically at page load:
+registration "generation," rather than dumped statically at page load. The condition table and the
+registration both read from one pure function, so the rail's "current tool surface" readout can
+never drift from what is actually registered:
 
 ```ts
-function useIncidentTools(incident: Incident | null, session: Session) {
-  useEffect(() => {
-    const ac = new AbortController();
-    const register = (t: ToolDef) => document.modelContext.registerTool(t, { signal: ac.signal });
+// apps/web/src/webmcp/registerTools.ts
+export function selectRegisteredTools(ctx: ToolSurfaceContext) {
+  const tools = [...INVESTIGATION_TOOLS];
+  if (ctx.role === "observer") return tools;
+  if (ctx.incidentId === null) return tools;
 
-    investigationTools.forEach(register);
-    if (incident && session.role !== 'observer') {
-      actionToolsFor(incident).forEach(register);
-      approvalToolsFor(incident).forEach(register);
-    }
-    return () => ac.abort();   // unregisters every tool in this generation, fires toolchange
-  }, [incident?.id, incident?.state, session.role]);
+  if (ctx.incidentState !== "RESOLVED") {
+    tools.push(assignIncident, resolveIncident, rollbackDeployment,
+               restartService, scaleService, disableFeatureFlag);
+  }
+  tools.push(getPendingApprovals, requestApproval);
+  if (ctx.hasPendingApproval) tools.push(recordApproval);
+  return tools;
+}
+
+export function registerDynamicTools(ctx: ToolSurfaceContext): () => void {
+  const controller = new AbortController();
+  for (const tool of selectRegisteredTools(ctx)) {
+    document.modelContext
+      .registerTool({ ...tool, execute: instrument(tool) }, { signal: controller.signal })
+      .catch((err) => console.warn(`[webmcp] failed to register "${tool.name}":`, err));
+  }
+  return () => controller.abort();   // unregisters this generation, fires toolchange
 }
 ```
+
+`AppShell` creates one generation per distinct `(incidentId, role, incidentState,
+hasPendingApproval)` and tears the previous one down before building the next. `registerTool()`
+returns a promise that can reject, so every call has a `.catch` — a name collision must surface as a
+warning, never as an unhandled rejection.
 
 What actually varies:
 
 | Condition | Effect on the registered surface |
 |---|---|
-| `observer` role | Action tools never register — verified with a real `document.modelContext.getTools()` call: exactly the 12 investigation tools |
+| `observer` role | Action tools never register, and the two forms are not rendered either |
 | No incident selected | Action/approval tools stay unregistered |
 | Incident state is `RESOLVED` | Remediation tools unregister |
 | No approval pending | `record_approval` unregisters |
 | Service has no rollback target | `rollback_deployment` **still registers** and fails fast with an explanatory message, rather than silently disappearing |
 
-The last row is deliberate: unregistering a tool is invisible to the agent, but a tool that
-explains *why* it can't help teaches it something the agent can act on. We unregister for
-**authority** ("you may not do this right now") and fail loudly for **feasibility** ("this specific
-call cannot succeed"), and those are different situations that deserve different signals.
+The last row is deliberate: unregistering a tool is invisible to the agent, but a tool that explains
+*why* it can't help teaches it something the agent can act on. We unregister for **authority** ("you
+may not do this right now") and fail loudly for **feasibility** ("this specific call cannot
+succeed"), and those are different situations that deserve different signals.
+
+Measured on production with real `document.modelContext.getTools()` calls (Chrome 152, no flags,
+2026-09-03): `responder` **22** → switch to `observer` **12**, exactly the read-only investigation
+tools and no forms → switch back **22**, no duplicate-name rejections in either direction.
 
 ## The shared-context thesis
 
@@ -125,9 +180,14 @@ overlay spotlights the runbook or alert being read. The agent's evidence, its re
 approval card it produces all render in the same place the human responder is already looking, at
 the moment of the decision — not in a separate chat window describing what happened elsewhere.
 
+The mechanism is `src/console/toolActivity.tsx`, a React context fed by the instrumentation wrapper
+in `registerTools.ts`: one record per call, updated in place from started to settled, which both the
+agent lane and the relevant console panel subscribe to. It is not a rendering afterthought — it is
+the reactivity contract, and it is why `reason` is required.
+
 A server-side MCP over the same underlying data (a Datadog- or PagerDuty-shaped tool set) would
 produce a chat transcript describing an incident. This produces a console where the approval card
 sits beside the graph that justifies it, the topology node that turned red, and the log line that
 proves it. That's the answer to "could you remove WebMCP and leave almost the same product?" — no,
-because the shared context between agent and human is the product, and it depends on the tool
-calls and the console rendering the same origin's DOM.
+because the shared context between agent and human is the product, and it depends on the tool calls
+and the console rendering the same origin's DOM.
